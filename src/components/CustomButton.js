@@ -3,7 +3,7 @@ import { TouchableOpacity, Text, StyleSheet, ActivityIndicator, View } from 'rea
 import { Ionicons } from '@expo/vector-icons';
 import { COLORS } from '../constants';
 
-export const CustomButton = ({
+export const CustomButton = React.memo(({
     title,
     onPress,
     loading = false,
@@ -66,7 +66,7 @@ export const CustomButton = ({
             )}
         </TouchableOpacity>
     );
-};
+});
 
 const styles = StyleSheet.create({
     button: {

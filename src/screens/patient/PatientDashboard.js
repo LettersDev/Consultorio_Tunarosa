@@ -27,19 +27,20 @@ export const PatientDashboard = ({ navigation }) => {
     }, []);
 
     const loadData = async () => {
-        const { data: userData } = await authService.getCurrentUser();
-        if (userData) {
-            setUser(userData);
-            const { data: appointmentsData } = await appointmentService.getPatientAppointments(userData.id);
-            setAppointments(appointmentsData || []);
+        try {
+            setLoading(true);
+            const { data: userData } = await authService.getCurrentUser();
+            console.log('PatientDashboard: User Data id:', userData?.id);
+            if (userData && userData.id) {
+                setUser(userData);
+                const { data: appointmentsData } = await appointmentService.getPatientAppointments(userData.id);
+                setAppointments(appointmentsData || []);
+            }
+        } catch (error) {
+            console.error('Error loading patient dashboard:', error);
+        } finally {
+            setLoading(false);
         }
-        setLoading(false);
-    };
-
-    const onRefresh = async () => {
-        setRefreshing(true);
-        await loadData();
-        setRefreshing(false);
     };
 
     const handleLogout = async () => {
@@ -57,14 +58,6 @@ export const PatientDashboard = ({ navigation }) => {
                 },
             ]
         );
-    };
-
-    const getUpcomingAppointments = () => {
-        const now = new Date();
-        return appointments.filter(apt => {
-            const aptDate = new Date(apt.date);
-            return aptDate >= now && apt.status !== 'cancelled';
-        }).sort((a, b) => new Date(a.date) - new Date(b.date));
     };
 
     const getStatusColor = (status) => {
@@ -127,7 +120,19 @@ export const PatientDashboard = ({ navigation }) => {
         }
     };
 
-    const upcomingAppointments = getUpcomingAppointments();
+    const onRefresh = async () => {
+        setRefreshing(true);
+        await loadData();
+        setRefreshing(false);
+    };
+
+    const upcomingAppointments = React.useMemo(() => {
+        const d = new Date();
+        const today = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+        return appointments.filter(apt => {
+            return apt.date >= today && apt.status !== 'cancelled';
+        }).sort((a, b) => a.date.localeCompare(b.date) || (a.time || '').localeCompare(b.time || ''));
+    }, [appointments]);
 
     if (loading) {
         return (
@@ -190,10 +195,10 @@ export const PatientDashboard = ({ navigation }) => {
                                     <View style={styles.appointmentMain}>
                                         <View style={styles.appointmentDateWidget}>
                                             <Text style={styles.dateDay}>
-                                                {new Date(appointment.date).toLocaleDateString('es-ES', { day: 'numeric' })}
+                                                {appointment.date.split('-')[2]}
                                             </Text>
                                             <Text style={styles.dateMonth}>
-                                                {new Date(appointment.date).toLocaleDateString('es-ES', { month: 'short' }).toUpperCase()}
+                                                {new Date(appointment.date + 'T12:00:00').toLocaleDateString('es-ES', { month: 'short' }).toUpperCase()}
                                             </Text>
                                         </View>
 

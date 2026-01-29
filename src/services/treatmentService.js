@@ -29,11 +29,15 @@ export const treatmentService = {
 
     // Get treatments for a patient
     async getPatientTreatments(patientId) {
+        if (patientId === 'undefined' || !patientId) {
+            console.error('getPatientTreatments: patientId is invalid:', patientId);
+            return { data: [], error: null };
+        }
         try {
             const { data, error } = await supabase
                 .from('treatments')
                 .select(`
-          *,
+          id, treatment_type, treatment_date, notes, affected_teeth, cost, payment_status,
           doctor:users!treatments_doctor_id_fkey(name)
         `)
                 .eq('patient_id', patientId)
@@ -191,11 +195,15 @@ export const treatmentService = {
 
     // Get payments for a patient
     async getPatientPayments(patientId) {
+        if (patientId === 'undefined' || !patientId) {
+            console.error('getPatientPayments: patientId is invalid:', patientId);
+            return { data: [], error: null };
+        }
         try {
             const { data, error } = await supabase
                 .from('payments')
                 .select(`
-          *,
+          id, amount, payment_date, payment_method, notes,
           treatment:treatments(treatment_type, treatment_date)
         `)
                 .eq('patient_id', patientId)

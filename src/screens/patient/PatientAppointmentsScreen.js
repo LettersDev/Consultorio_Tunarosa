@@ -15,10 +15,13 @@ export const PatientAppointmentsScreen = ({ navigation }) => {
 
     const loadAppointments = useCallback(async () => {
         try {
-            const user = await authService.getCurrentUser();
+            const { data: user } = await authService.getCurrentUser();
             if (user) {
-                const data = await appointmentService.getPatientAppointments(user.id);
-                setAppointments(data);
+                const { data, error } = await appointmentService.getPatientAppointments(user.id);
+                if (error) throw error;
+                // Sort by date and time
+                const sorted = (data || []).sort((a, b) => b.date.localeCompare(a.date) || (b.time || '').localeCompare(a.time || ''));
+                setAppointments(sorted);
             }
         } catch (error) {
             console.error('Error loading appointments:', error);
@@ -72,9 +75,10 @@ export const PatientAppointmentsScreen = ({ navigation }) => {
                     onPress: async () => {
                         try {
                             setLoading(true);
+                            const { data: currentUser } = await authService.getCurrentUser();
                             const { error } = await appointmentService.cancelAppointment(
                                 appointmentId,
-                                'patient',
+                                currentUser?.id || 'patient',
                                 'Cancelada por el paciente'
                             );
                             if (error) throw error;
@@ -105,7 +109,7 @@ export const PatientAppointmentsScreen = ({ navigation }) => {
                 <View style={styles.infoRow}>
                     <Ionicons name="calendar-outline" size={18} color={COLORS.primary} />
                     <Paragraph style={styles.infoText}>
-                        {new Date(item.date).toLocaleDateString('es-ES', {
+                        {new Date(item.date + 'T12:00:00').toLocaleDateString('es-ES', {
                             weekday: 'long',
                             year: 'numeric',
                             month: 'long',

@@ -4,7 +4,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { COLORS } from '../constants';
 import { whatsappService } from '../services/whatsappService';
 
-export const WhatsAppButton = ({
+export const WhatsAppButton = React.memo(({
     phoneNumber,
     message = '',
     userName = '',
@@ -52,7 +52,7 @@ export const WhatsAppButton = ({
             </Text>
         </TouchableOpacity>
     );
-};
+});
 
 const styles = StyleSheet.create({
     button: {

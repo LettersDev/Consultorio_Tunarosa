@@ -27,19 +27,21 @@ export const DoctorDashboard = ({ navigation }) => {
     }, []);
 
     const loadData = async () => {
-        const { data: userData } = await authService.getCurrentUser();
-        if (userData) {
-            setUser(userData);
-            const { data: appointmentsData } = await appointmentService.getDoctorAppointments(userData.id);
-            setAppointments(appointmentsData || []);
+        try {
+            setLoading(true);
+            const { data: userData } = await authService.getCurrentUser();
+            if (userData) {
+                setUser(userData);
+                // Fetch appointments in parallel with user check if possible, 
+                // but here data depends on userData.id
+                const { data: appointmentsData } = await appointmentService.getDoctorAppointments(userData.id);
+                setAppointments(appointmentsData || []);
+            }
+        } catch (error) {
+            console.error('Error loading dashboard data:', error);
+        } finally {
+            setLoading(false);
         }
-        setLoading(false);
-    };
-
-    const onRefresh = async () => {
-        setRefreshing(true);
-        await loadData();
-        setRefreshing(false);
     };
 
     const handleConfirm = async (appointmentId) => {
@@ -73,23 +75,26 @@ export const DoctorDashboard = ({ navigation }) => {
         );
     };
 
-    const getTodayAppointments = () => {
+    const onRefresh = async () => {
+        setRefreshing(true);
+        await loadData();
+        setRefreshing(false);
+    };
+
+    const todayAppointments = React.useMemo(() => {
         const d = new Date();
         const today = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
         return appointments.filter(apt => apt.date === today && apt.status !== 'cancelled')
             .sort((a, b) => (a.time || '').localeCompare(b.time || ''));
-    };
+    }, [appointments]);
 
-    const getUpcomingAppointments = () => {
+    const upcomingAppointments = React.useMemo(() => {
         const d = new Date();
         const today = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
         return appointments.filter(apt => apt.date > today && apt.status !== 'cancelled')
-            .sort((a, b) => new Date(a.date) - new Date(b.date))
+            .sort((a, b) => a.date.localeCompare(b.date) || (a.time || '').localeCompare(b.time || ''))
             .slice(0, 5);
-    };
-
-    const todayAppointments = getTodayAppointments();
-    const upcomingAppointments = getUpcomingAppointments();
+    }, [appointments]);
 
     return (
         <View style={styles.container}>
@@ -226,10 +231,10 @@ export const DoctorDashboard = ({ navigation }) => {
                             >
                                 <View style={styles.upcomingDate}>
                                     <Text style={styles.upcomingDay}>
-                                        {new Date(appointment.date).toLocaleDateString('es-ES', { day: 'numeric' })}
+                                        {appointment.date.split('-')[2]}
                                     </Text>
                                     <Text style={styles.upcomingMonth}>
-                                        {new Date(appointment.date).toLocaleDateString('es-ES', { month: 'short' }).toUpperCase()}
+                                        {new Date(appointment.date + 'T12:00:00').toLocaleDateString('es-ES', { month: 'short' }).toUpperCase()}
                                     </Text>
                                 </View>
                                 <View style={styles.upcomingInfo}>

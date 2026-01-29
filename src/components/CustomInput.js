@@ -2,7 +2,7 @@ import React from 'react';
 import { View, TextInput, Text, StyleSheet } from 'react-native';
 import { COLORS } from '../constants';
 
-export const CustomInput = ({
+export const CustomInput = React.memo(({
     label,
     value,
     onChangeText,
@@ -38,7 +38,7 @@ export const CustomInput = ({
             {error ? <Text style={styles.errorText}>{error}</Text> : null}
         </View>
     );
-};
+});
 
 const styles = StyleSheet.create({
     container: {

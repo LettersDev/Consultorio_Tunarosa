@@ -109,7 +109,7 @@ export const AppointmentsOverviewScreen = ({ navigation }) => {
 
                 <View style={styles.infoRow}>
                     <Ionicons name="calendar-outline" size={16} color={COLORS.primary} />
-                    <Text style={styles.infoText}>{new Date(item.date).toLocaleDateString()}</Text>
+                    <Text style={styles.infoText}>{new Date(item.date + 'T12:00:00').toLocaleDateString()}</Text>
                     <Ionicons name="time-outline" size={16} color={COLORS.primary} style={{ marginLeft: 15 }} />
                     <Text style={styles.infoText}>{(item.time || '').substring(0, 5)}</Text>
                 </View>

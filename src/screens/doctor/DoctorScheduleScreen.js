@@ -16,11 +16,13 @@ export const DoctorScheduleScreen = ({ navigation }) => {
 
     const loadAppointments = useCallback(async () => {
         try {
-            const user = await authService.getCurrentUser();
-            if (user) {
+            const { data: user } = await authService.getCurrentUser();
+            console.log('DoctorSchedule: Current user id:', user?.id);
+            if (user && user.id) {
                 setDoctor(user);
-                const data = await appointmentService.getDoctorAppointments(user.id);
-                setAppointments(data);
+                const { data, error } = await appointmentService.getDoctorAppointments(user.id);
+                if (error) throw error;
+                setAppointments(data || []);
             }
         } catch (error) {
             console.error('Error loading doctor appointments:', error);

@@ -25,19 +25,21 @@ export const SecretaryDashboard = ({ navigation }) => {
     }, []);
 
     const loadData = async () => {
-        const { data: userData } = await authService.getCurrentUser();
-        if (userData) {
-            setUser(userData);
-            const { data: appointmentsData } = await appointmentService.getAllAppointments();
-            setAppointments(appointmentsData || []);
-        }
-        setLoading(false);
-    };
+        try {
+            setLoading(true);
+            // Parallel fetching
+            const [userResult, appointmentsResult] = await Promise.all([
+                authService.getCurrentUser(),
+                appointmentService.getAllAppointments()
+            ]);
 
-    const onRefresh = async () => {
-        setRefreshing(true);
-        await loadData();
-        setRefreshing(false);
+            if (userResult.data) setUser(userResult.data);
+            if (appointmentsResult.data) setAppointments(appointmentsResult.data);
+        } catch (error) {
+            console.error('Error loading secretary dashboard data:', error);
+        } finally {
+            setLoading(false);
+        }
     };
 
     const handleConfirm = async (appointmentId) => {
@@ -71,30 +73,28 @@ export const SecretaryDashboard = ({ navigation }) => {
         );
     };
 
-    const getTodayAppointments = () => {
-        const today = new Date().toISOString().split('T')[0];
-        return appointments.filter(apt => apt.date === today);
+    const onRefresh = async () => {
+        setRefreshing(true);
+        await loadData();
+        setRefreshing(false);
     };
 
-    const getPendingConfirmations = () => {
-        return appointments.filter(apt => !apt.confirmed && apt.status === 'pending');
-    };
-
-    const getStats = () => {
-        const today = getTodayAppointments();
-        const pending = getPendingConfirmations();
+    const stats = React.useMemo(() => {
+        const d = new Date();
+        const todayStr = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+        const todayApts = appointments.filter(apt => apt.date === todayStr);
+        const pending = appointments.filter(apt => !apt.confirmed && apt.status === 'pending');
         const cancelled = appointments.filter(apt => apt.status === 'cancelled');
 
         return {
-            today: today.length,
+            today: todayApts.length,
             pending: pending.length,
             cancelled: cancelled.length,
-            total: appointments.length,
+            todayApts,
         };
-    };
+    }, [appointments]);
 
-    const stats = getStats();
-    const todayAppointments = getTodayAppointments();
+    const todayAppointments = stats.todayApts;
 
     if (loading) {
         return (

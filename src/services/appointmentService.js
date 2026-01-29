@@ -4,10 +4,14 @@ import { notificationService } from './notificationService';
 export const appointmentService = {
     // Get available time slots for a specific date and doctor
     async getAvailableSlots(doctorId, date) {
+        if (doctorId === 'undefined') {
+            console.error('getAvailableSlots: doctorId is the string "undefined"');
+            return { data: null, error: new Error('Invalid doctorId') };
+        }
         try {
             const { data, error } = await supabase
                 .from('availability')
-                .select('*')
+                .select('id, time_slot, duration, is_available')
                 .eq('doctor_id', doctorId)
                 .eq('date', date)
                 .eq('is_available', true)
@@ -172,6 +176,10 @@ export const appointmentService = {
 
     // Get appointments for a patient
     async getPatientAppointments(patientId) {
+        if (patientId === 'undefined' || !patientId) {
+            console.error('getPatientAppointments: patientId is invalid:', patientId);
+            return { data: [], error: null };
+        }
         try {
             const { data, error } = await supabase
                 .from('appointments')
@@ -195,39 +203,16 @@ export const appointmentService = {
             console.log('Fetching appointments for doctor:', doctorId);
             const { data, error } = await supabase
                 .from('appointments')
-                .select('*')
+                .select(`
+                    id, date, time, duration, status, reason, confirmed, patient_id,
+                    patient:users!appointments_patient_id_fkey(id, name, phone, allergies, medications)
+                `)
                 .eq('doctor_id', doctorId)
                 .order('date', { ascending: true });
 
             if (error) {
                 console.error('Error fetching doctor appointments:', error);
-                throw error;
-            }
-
-            console.log('Raw appointments fetched:', data?.length || 0);
-
-            // Fetch patient data separately to avoid RLS issues
-            if (data && data.length > 0) {
-                const patientIds = [...new Set(data.map(apt => apt.patient_id))];
-                console.log('Fetching patient data for IDs:', patientIds);
-
-                const { data: patients, error: patientsError } = await supabase
-                    .from('users')
-                    .select('id, name, phone, allergies, medications')
-                    .in('id', patientIds);
-
-                if (patientsError) {
-                    console.error('Error fetching patients:', patientsError);
-                } else {
-                    console.log('Patients fetched:', patients?.length || 0);
-                    // Map patient data to appointments
-                    const enrichedData = data.map(apt => ({
-                        ...apt,
-                        patient: patients?.find(p => p.id === apt.patient_id) || null
-                    }));
-                    console.log('Sample enriched appointment:', enrichedData[0]);
-                    return { data: enrichedData, error: null };
-                }
+                return { data: null, error };
             }
 
             return { data, error: null };

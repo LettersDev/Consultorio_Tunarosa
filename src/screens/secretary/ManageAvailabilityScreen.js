@@ -42,26 +42,25 @@ export const ManageAvailabilityScreen = ({ navigation }) => {
 
     const fetchDoctors = async () => {
         try {
-            const { data, error } = await supabase
-                .from('users')
-                .select('id, name')
-                .eq('role', 'doctor');
+            setLoading(true);
+            const [{ data: doctorsData, error }, { data: userData }] = await Promise.all([
+                supabase.from('users').select('id, name').eq('role', 'doctor'),
+                authService.getCurrentUser()
+            ]);
 
             if (error) throw error;
-            setDoctors(data);
-
-            // Auto-select if current user is a doctor
-            const { data: userData } = await authService.getCurrentUser();
+            setDoctors(doctorsData || []);
             setUser(userData);
+
             if (userData && userData.role === 'doctor') {
-                const currentDoc = data.find(d => d.id === userData.id);
+                const currentDoc = (doctorsData || []).find(d => d.id === userData.id);
                 if (currentDoc) setSelectedDoctor(currentDoc);
-                else if (data.length > 0) setSelectedDoctor(data[0]);
-            } else if (data.length > 0) {
-                setSelectedDoctor(data[0]);
+                else if (doctorsData?.length > 0) setSelectedDoctor(doctorsData[0]);
+            } else if (doctorsData?.length > 0) {
+                setSelectedDoctor(doctorsData[0]);
             }
         } catch (error) {
-            console.error('Error fetching doctors:', error);
+            console.error('Error fetching initial data:', error);
         } finally {
             setLoading(false);
         }
@@ -363,8 +362,8 @@ export const ManageAvailabilityScreen = ({ navigation }) => {
                         </View>
 
                         <View style={styles.weekDays}>
-                            {['D', 'L', 'M', 'M', 'J', 'V', 'S'].map((day, idx) => (
-                                <Text key={`${day}-${idx}`} style={styles.weekDayText}>{day}</Text>
+                            {['D', 'L', 'M', 'X', 'J', 'V', 'S'].map((day, idx) => (
+                                <Text key={`day-header-${idx}`} style={styles.weekDayText}>{day}</Text>
                             ))}
                         </View>
 

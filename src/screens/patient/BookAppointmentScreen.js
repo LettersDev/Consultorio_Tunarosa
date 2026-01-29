@@ -42,21 +42,18 @@ export const BookAppointmentScreen = ({ navigation }) => {
     const fetchInitialData = async () => {
         try {
             setLoading(true);
-            // Get current user
-            const { data: userData } = await authService.getCurrentUser();
-            setCurrentUser(userData);
+            // Parallel fetching
+            const [userResult, doctorsResult] = await Promise.all([
+                authService.getCurrentUser(),
+                supabase.from('users').select('id, name').eq('role', 'doctor')
+            ]);
 
-            // Fetch doctors
-            const { data: doctorsData, error: doctorsError } = await supabase
-                .from('users')
-                .select('id, name')
-                .eq('role', 'doctor');
-
-            if (doctorsError) throw doctorsError;
-            setDoctors(doctorsData);
-
-            if (doctorsData.length > 0) {
-                setSelectedDoctor(doctorsData[0]);
+            if (userResult.data) setCurrentUser(userResult.data);
+            if (doctorsResult.data) {
+                setDoctors(doctorsResult.data);
+                if (doctorsResult.data.length > 0) {
+                    setSelectedDoctor(doctorsResult.data[0]);
+                }
             }
         } catch (error) {
             console.error('Error fetching initial data:', error);
@@ -71,7 +68,6 @@ export const BookAppointmentScreen = ({ navigation }) => {
         try {
             const d = new Date(date);
             const formattedDate = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-            console.log('Fetching slots for:', selectedDoctor.name, 'on', formattedDate);
             const { data, error } = await appointmentService.getAvailableSlots(selectedDoctor.id, formattedDate);
 
             if (error) throw error;
@@ -81,16 +77,6 @@ export const BookAppointmentScreen = ({ navigation }) => {
             console.error('Error fetching slots:', error);
             Alert.alert('Error', 'No se pudieron cargar los horarios disponibles.');
         }
-    };
-
-    const getNextDays = () => {
-        const days = [];
-        for (let i = 0; i < 14; i++) {
-            const d = new Date();
-            d.setDate(d.getDate() + i);
-            days.push(d);
-        }
-        return days;
     };
 
     const handleDateChange = (selectedDate) => {
@@ -105,7 +91,7 @@ export const BookAppointmentScreen = ({ navigation }) => {
         setCurrentMonth(newMonth);
     };
 
-    const getDaysForMonth = () => {
+    const monthDays = React.useMemo(() => {
         const days = [];
         const year = currentMonth.getFullYear();
         const month = currentMonth.getMonth();
@@ -115,7 +101,7 @@ export const BookAppointmentScreen = ({ navigation }) => {
             days.push(new Date(year, month, i));
         }
         return days;
-    };
+    }, [currentMonth]);
 
     const handleBook = async () => {
         if (!selectedSlot) {
@@ -246,7 +232,7 @@ export const BookAppointmentScreen = ({ navigation }) => {
                     </View>
 
                     <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.dateScroll}>
-                        {getDaysForMonth().map((d, index) => {
+                        {monthDays.map((d, index) => {
                             const isSelected = d.toDateString() === date.toDateString();
                             const isPast = d < new Date().setHours(0, 0, 0, 0);
 

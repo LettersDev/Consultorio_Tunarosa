@@ -26,41 +26,27 @@ export const PatientDetailScreen = ({ route, navigation }) => {
         try {
             setLoading(true);
 
-            // Fetch patient user data
-            const { data: userData, error: userError } = await supabase
-                .from('users')
-                .select('*')
-                .eq('id', patientId)
-                .maybeSingle();
+            // Parallel fetching of all patient-related data
+            const [userResult, treatmentsResult, chartResult, appsResult] = await Promise.all([
+                supabase.from('users').select('*').eq('id', patientId).maybeSingle(),
+                treatmentService.getPatientTreatments(patientId),
+                treatmentService.getDentalChart(patientId),
+                appointmentId ? supabase.from('appointments').select('*').eq('id', appointmentId).maybeSingle() : Promise.resolve({ data: null })
+            ]);
 
-            if (userError) throw userError;
-            if (!userData) {
+            if (userResult.error) throw userResult.error;
+            if (!userResult.data) {
                 Alert.alert('Error', 'No se encontró la información del paciente.');
                 navigation.goBack();
                 return;
             }
-            setPatient(userData);
 
-            // Fetch treatments
-            const treatmentHistory = await treatmentService.getPatientTreatments(patientId);
-            setTreatments(treatmentHistory.data || []);
+            setPatient(userResult.data);
+            setTreatments(treatmentsResult.data || []);
+            setDentalChart(chartResult.data || []);
+            setAppointment(appsResult.data);
 
-            // Fetch specific appointment if ID is provided
-            if (appointmentId) {
-                const { data: apptData } = await supabase
-                    .from('appointments')
-                    .select('*')
-                    .eq('id', appointmentId)
-                    .maybeSingle();
-                setAppointment(apptData);
-            }
-
-            // Fetch dental chart
-            const { data: chartData, error: chartError } = await treatmentService.getDentalChart(patientId);
-            if (chartError) throw chartError;
-            setDentalChart(chartData || []);
-
-            // Fetch prescriptions
+            // Fetch prescriptions independently (less critical)
             loadPrescriptions();
 
         } catch (error) {
