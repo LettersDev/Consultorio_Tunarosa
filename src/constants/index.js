@@ -1,21 +1,23 @@
 export const COLORS = {
-    primary: '#0D47A1',    // Azul Navy profundo (Profesional)
-    secondary: '#1976D2',  // Azul médico
-    accent: '#64B5F6',     // Azul cielo suave
-    background: '#F8F9FA', // Blanco grisáceo muy limpio
+    primary: '#0EA5E9',    // Sky Blue (más claro y fresco)
+    secondary: '#38BDF8',  // Sky Blue claro
+    accent: '#7DD3FC',     // Sky Blue suave
+    background: '#F8FAFC',
     surface: '#FFFFFF',
-    success: '#2E7D32',    // Verde esmeralda profesional
-    warning: '#F9A825',
-    error: '#C62828',
-    text: '#121212',
-    textSecondary: '#5F6368',
-    border: '#E8EAED',
+    success: '#10B981',
+    warning: '#F59E0B',
+    error: '#EF4444',
+    text: '#0F172A',
+    textSecondary: '#64748B',
+    border: '#E2E8F0',
+    white: '#FFFFFF',
 };
 
 export const ROLES = {
     PATIENT: 'patient',
     DOCTOR: 'doctor',
     SECRETARY: 'secretary',
+    ADMIN: 'admin',
 };
 
 export const APPOINTMENT_STATUS = {

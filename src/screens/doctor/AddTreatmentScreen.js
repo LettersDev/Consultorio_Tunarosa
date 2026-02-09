@@ -4,16 +4,15 @@ import { Text, Title, TextInput, IconButton, Checkbox, Card, Divider, Badge } fr
 import { Ionicons } from '@expo/vector-icons';
 import { treatmentService } from '../../services/treatmentService';
 import { appointmentService } from '../../services/appointmentService';
+import { supabase } from '../../../supabase.config';
 import { COLORS, TREATMENT_TYPES, TOOTH_CONDITIONS, APPOINTMENT_STATUS } from '../../constants';
 import { CustomButton } from '../../components/CustomButton';
 
 export const AddTreatmentScreen = ({ route, navigation }) => {
     const { patientId, appointmentId, preSelectedTooth } = route.params;
-    const [treatmentType, setTreatmentType] = useState(TREATMENT_TYPES.CLEANING);
+    const [treatmentType, setTreatmentType] = useState('');
     const [selectedTeeth, setSelectedTeeth] = useState(preSelectedTooth ? [preSelectedTooth] : []);
     const [notes, setNotes] = useState('');
-    const [cost, setCost] = useState('');
-    const [isPaid, setIsPaid] = useState(false);
     const [loading, setLoading] = useState(false);
 
     const toggleTooth = (toothNum) => {
@@ -33,13 +32,14 @@ export const AddTreatmentScreen = ({ route, navigation }) => {
         try {
             setLoading(true);
 
+            const { data: userData } = await supabase.auth.getUser();
             const treatmentData = {
                 patient_id: patientId,
+                doctor_id: userData.user.id,
                 treatment_type: treatmentType,
                 affected_teeth: selectedTeeth,
                 notes,
-                cost: parseFloat(cost) || 0,
-                payment_status: isPaid ? 'completed' : 'pending'
+                treatment_date: new Date().toISOString().split('T')[0],
             };
 
             await treatmentService.addTreatment(treatmentData);
@@ -108,28 +108,16 @@ export const AddTreatmentScreen = ({ route, navigation }) => {
             >
                 <View style={styles.section}>
                     <Text style={styles.label}>Tipo de Procedimiento</Text>
-                    <ScrollView
-                        horizontal
-                        showsHorizontalScrollIndicator={false}
-                        style={styles.typeSelector}
-                        contentContainerStyle={styles.typeSelectorContent}
-                    >
-                        {Object.values(TREATMENT_TYPES).map(type => (
-                            <TouchableOpacity
-                                key={type}
-                                style={[
-                                    styles.typeItem,
-                                    treatmentType === type && styles.typeSelected
-                                ]}
-                                onPress={() => setTreatmentType(type)}
-                            >
-                                <Text style={[
-                                    styles.typeText,
-                                    treatmentType === type && styles.typeTextSelected
-                                ]}>{type}</Text>
-                            </TouchableOpacity>
-                        ))}
-                    </ScrollView>
+                    <TextInput
+                        mode="outlined"
+                        placeholder="Ej: Limpieza dental, Extracción, Corona, etc."
+                        value={treatmentType}
+                        onChangeText={setTreatmentType}
+                        style={styles.textArea}
+                        outlineColor={COLORS.border}
+                        activeOutlineColor={COLORS.primary}
+                        outlineStyle={{ borderRadius: 16 }}
+                    />
                 </View>
 
                 <View style={styles.section}>
@@ -158,46 +146,6 @@ export const AddTreatmentScreen = ({ route, navigation }) => {
                     />
                 </View>
 
-                <View style={styles.row}>
-                    <View style={[styles.section, { flex: 1 }]}>
-                        <Text style={styles.label}>Inversión / Costo ($)</Text>
-                        <TextInput
-                            mode="outlined"
-                            placeholder="0.00"
-                            keyboardType="numeric"
-                            value={cost}
-                            onChangeText={setCost}
-                            style={styles.input}
-                            outlineColor={COLORS.border}
-                            activeOutlineColor={COLORS.primary}
-                            outlineStyle={{ borderRadius: 16 }}
-                            left={<TextInput.Affix text="$ " />}
-                        />
-                    </View>
-
-                    <View style={[styles.section, { flex: 1, justifyContent: 'flex-end' }]}>
-                        <TouchableOpacity
-                            style={[
-                                styles.paymentToggle,
-                                isPaid ? styles.paidActive : styles.unpaidActive
-                            ]}
-                            onPress={() => setIsPaid(!isPaid)}
-                        >
-                            <Ionicons
-                                name={isPaid ? "checkmark-circle" : "alert-circle"}
-                                size={20}
-                                color={isPaid ? COLORS.success : COLORS.textSecondary}
-                            />
-                            <Text style={[
-                                styles.paymentLabel,
-                                { color: isPaid ? COLORS.success : COLORS.textSecondary }
-                            ]}>
-                                {isPaid ? 'Pagado' : 'Pendiente'}
-                            </Text>
-                        </TouchableOpacity>
-                    </View>
-                </View>
-
                 <View style={styles.actionSection}>
                     <CustomButton
                         title="Confirmar Registro"
@@ -208,8 +156,8 @@ export const AddTreatmentScreen = ({ route, navigation }) => {
                     />
                 </View>
                 <View style={styles.footerSpacer} />
-            </ScrollView>
-        </View>
+            </ScrollView >
+        </View >
     );
 };
 

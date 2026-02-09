@@ -1,11 +1,16 @@
 import { Linking } from 'react-native';
 
 export const whatsappService = {
-    // Format phone number for WhatsApp (remove special characters)
+    // Format phone number for WhatsApp (remove special characters and add country code)
     formatPhoneNumber(phone) {
         if (!phone) return '';
         // Remove all non-numeric characters
-        return phone.replace(/\D/g, '');
+        let cleaned = phone.replace(/\D/g, '');
+        // If it doesn't start with country code, add Venezuela's +58
+        if (!cleaned.startsWith('58')) {
+            cleaned = '58' + cleaned;
+        }
+        return cleaned;
     },
 
     // Open WhatsApp with pre-filled message

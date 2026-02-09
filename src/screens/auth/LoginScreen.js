@@ -7,7 +7,9 @@ import {
     KeyboardAvoidingView,
     Platform,
     Alert,
+    TouchableOpacity,
 } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { CustomInput } from '../../components/CustomInput';
 import { CustomButton } from '../../components/CustomButton';
 import { authService } from '../../services/authService';
@@ -50,8 +52,30 @@ export const LoginScreen = ({ navigation }) => {
             Alert.alert('Error de Inicio de Sesión', message);
             return;
         }
+    };
 
-        // Navigation will be handled by the main App component based on user role
+    const handleForgotPassword = async () => {
+        if (!email.trim()) {
+            Alert.alert('Recuperar Contraseña', 'Por favor ingresa tu correo electrónico primero.');
+            return;
+        }
+        if (!/\S+@\S+\.\S+/.test(email)) {
+            Alert.alert('Error', 'Por favor ingresa un correo válido.');
+            return;
+        }
+
+        setLoading(true);
+        const { error } = await authService.resetPassword(email);
+        setLoading(false);
+
+        if (error) {
+            Alert.alert('Error', error.message || 'No se pudo enviar el correo de recuperación.');
+        } else {
+            Alert.alert(
+                'Correo Enviado',
+                'Si el correo existe en nuestro sistema, recibirás un enlace para restablecer tu contraseña.'
+            );
+        }
     };
 
     return (
@@ -59,47 +83,55 @@ export const LoginScreen = ({ navigation }) => {
             behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
             style={styles.container}
         >
-            <ScrollView contentContainerStyle={styles.scrollContent}>
+            <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
                 <View style={styles.header}>
-                    <Text style={styles.title}>Consultorio Dental</Text>
-                    <Text style={styles.subtitle}>Inicia sesión en tu cuenta</Text>
+                    <Text style={styles.title}>Consultorio Tunarosa</Text>
+                    <Text style={styles.subtitle}>Cuidado dental de confianza</Text>
                 </View>
 
-                <View style={styles.form}>
-                    <CustomInput
-                        label="Correo Electrónico"
-                        value={email}
-                        onChangeText={setEmail}
-                        placeholder="ejemplo@correo.com"
-                        keyboardType="email-address"
-                        error={errors.email}
-                    />
+                <View style={styles.card}>
+                    <Text style={styles.cardTitle}>Bienvenido</Text>
+                    <Text style={styles.cardSubtitle}>Ingresa tus credenciales para continuar</Text>
 
-                    <CustomInput
-                        label="Contraseña"
-                        value={password}
-                        onChangeText={setPassword}
-                        placeholder="••••••••"
-                        secureTextEntry
-                        error={errors.password}
-                    />
+                    <View style={styles.form}>
+                        <CustomInput
+                            label="Correo Electrónico"
+                            value={email}
+                            onChangeText={setEmail}
+                            placeholder="ejemplo@correo.com"
+                            keyboardType="email-address"
+                            error={errors.email}
+                            icon="mail-outline"
+                        />
 
-                    <CustomButton
-                        title="Iniciar Sesión"
-                        onPress={handleLogin}
-                        loading={loading}
-                        style={styles.loginButton}
-                    />
+                        <CustomInput
+                            label="Contraseña"
+                            value={password}
+                            onChangeText={setPassword}
+                            placeholder="••••••••"
+                            secureTextEntry
+                            error={errors.password}
+                            icon="lock-closed-outline"
+                        />
 
-                    <View style={styles.registerContainer}>
-                        <Text style={styles.registerText}>¿No tienes cuenta? </Text>
+                        <TouchableOpacity onPress={handleForgotPassword} style={styles.forgotPassword}>
+                            <Text style={styles.forgotPasswordText}>¿Olvidaste tu contraseña?</Text>
+                        </TouchableOpacity>
+
                         <CustomButton
-                            title="Regístrate aquí"
-                            onPress={() => navigation.navigate('Auth_Register')}
-                            variant="outline"
-                            style={styles.registerButton}
+                            title="Iniciar Sesión"
+                            onPress={handleLogin}
+                            loading={loading}
+                            style={styles.loginButton}
                         />
                     </View>
+                </View>
+
+                <View style={styles.footer}>
+                    <Text style={styles.registerText}>¿Aún no tienes una cuenta?</Text>
+                    <TouchableOpacity onPress={() => navigation.navigate('Auth_Register')}>
+                        <Text style={styles.registerLink}>Regístrate ahora</Text>
+                    </TouchableOpacity>
                 </View>
             </ScrollView>
         </KeyboardAvoidingView>
@@ -118,34 +150,73 @@ const styles = StyleSheet.create({
     },
     header: {
         alignItems: 'center',
-        marginBottom: 40,
+        marginBottom: 30,
     },
     title: {
-        fontSize: 32,
-        fontWeight: 'bold',
+        fontSize: 28,
+        fontWeight: '900',
         color: COLORS.primary,
-        marginBottom: 8,
+        textAlign: 'center',
     },
     subtitle: {
-        fontSize: 16,
+        fontSize: 15,
         color: COLORS.textSecondary,
+        marginTop: 4,
+        fontWeight: '500',
+    },
+    card: {
+        backgroundColor: COLORS.surface,
+        borderRadius: 30,
+        padding: 24,
+        elevation: 10,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 10 },
+        shadowOpacity: 0.08,
+        shadowRadius: 20,
+    },
+    cardTitle: {
+        fontSize: 22,
+        fontWeight: '800',
+        color: COLORS.text,
+        marginBottom: 4,
+    },
+    cardSubtitle: {
+        fontSize: 14,
+        color: COLORS.textSecondary,
+        marginBottom: 24,
     },
     form: {
         width: '100%',
     },
     loginButton: {
-        marginTop: 8,
+        marginTop: 10,
+        borderRadius: 16,
+        height: 56,
     },
-    registerContainer: {
-        marginTop: 24,
+    forgotPassword: {
+        alignSelf: 'flex-end',
+        marginBottom: 20,
+        marginTop: -10,
+    },
+    forgotPasswordText: {
+        fontSize: 13,
+        color: COLORS.secondary,
+        fontWeight: '600',
+    },
+    footer: {
+        marginTop: 30,
         alignItems: 'center',
+        flexDirection: 'row',
+        justifyContent: 'center',
+        gap: 8,
     },
     registerText: {
         fontSize: 14,
         color: COLORS.textSecondary,
-        marginBottom: 12,
     },
-    registerButton: {
-        width: '100%',
+    registerLink: {
+        fontSize: 14,
+        color: COLORS.primary,
+        fontWeight: '700',
     },
 });

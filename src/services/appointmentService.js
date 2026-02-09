@@ -110,6 +110,7 @@ export const appointmentService = {
                 .eq('time_slot', newTime);
 
             // Send notification to patient
+            console.log(`[AppointmentService] Notificando reagendamiento al paciente: ${data.patient_id}`);
             await notificationService.sendRescheduleNotification(data, currentAppointment);
 
             return { data, error: null };
@@ -162,6 +163,7 @@ export const appointmentService = {
                 .eq('time_slot', currentAppointment.time);
 
             // Send cancellation notification
+            console.log(`[AppointmentService] Notificando cancelación al paciente: ${currentAppointment.patient_id}`);
             await notificationService.sendCancellationNotification({
                 ...currentAppointment,
                 status: 'cancelled'
@@ -246,17 +248,23 @@ export const appointmentService = {
         try {
             console.log('Confirming appointment with ID:', appointmentId);
 
-            const { error } = await supabase
+            const { data, error } = await supabase
                 .from('appointments')
                 .update({ confirmed: true, status: 'confirmed' })
-                .eq('id', appointmentId);
-
-            console.log('Update completed, error:', error);
+                .eq('id', appointmentId)
+                .select()
+                .single();
 
             if (error) throw error;
 
-            // Update was successful, return a simple confirmation
-            return { data: { id: appointmentId }, error: null };
+            // Send notification to patient
+            await notificationService.createNotification(
+                data.patient_id,
+                '✅ Cita Confirmada',
+                `Tu cita del ${data.date} a las ${data.time} ha sido confirmada por el doctor.`
+            );
+
+            return { data, error: null };
         } catch (error) {
             console.error('Error confirming appointment:', error);
             return { data: null, error };

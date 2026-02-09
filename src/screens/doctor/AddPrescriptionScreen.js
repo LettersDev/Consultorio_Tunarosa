@@ -3,6 +3,7 @@ import { View, StyleSheet, ScrollView, Alert, TouchableOpacity } from 'react-nat
 import { Text, Title, TextInput, List, IconButton, Card, Divider, Badge } from 'react-native-paper';
 import { Ionicons } from '@expo/vector-icons';
 import { treatmentService } from '../../services/treatmentService';
+import { appointmentService } from '../../services/appointmentService';
 import { supabase } from '../../../supabase.config';
 import { COLORS } from '../../constants';
 import { CustomButton } from '../../components/CustomButton';
@@ -37,21 +38,38 @@ export const AddPrescriptionScreen = ({ route, navigation }) => {
         try {
             setLoading(true);
 
+            const { data: userData } = await supabase.auth.getUser();
             const prescriptionData = {
                 patient_id: patientId,
-                doctor_id: (await supabase.auth.getUser()).data.user.id,
-                appointment_id: appointmentId,
+                doctor_id: userData.user.id,
+                appointment_id: appointmentId || null,
                 medications: medications,
+                created_at: new Date().toISOString(),
             };
 
-            await treatmentService.addPrescription(prescriptionData);
+            console.log('Saving prescription:', prescriptionData);
+            const result = await treatmentService.addPrescription(prescriptionData);
+            console.log('Prescription save result:', result);
+
+            if (result.error) {
+                throw result.error;
+            }
+
+            // Si hay una cita asociada, marcarla como completada
+            if (appointmentId) {
+                try {
+                    await appointmentService.updateAppointmentStatus(appointmentId, 'completed');
+                } catch (updateErr) {
+                    console.error('Error al completar cita desde receta:', updateErr);
+                }
+            }
 
             Alert.alert('Éxito', 'Receta digital guardada correctamente.', [
                 { text: 'OK', onPress: () => navigation.goBack() }
             ]);
         } catch (error) {
             console.error('Error adding prescription:', error);
-            Alert.alert('Error', 'No se pudo guardar la receta.');
+            Alert.alert('Error', `No se pudo guardar la receta: ${error.message || error}`);
         } finally {
             setLoading(false);
         }

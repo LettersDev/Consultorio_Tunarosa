@@ -12,6 +12,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { authService } from '../../services/authService';
 import { appointmentService } from '../../services/appointmentService';
 import { CustomButton } from '../../components/CustomButton';
+import { supabase } from '../../../supabase.config';
 import { COLORS } from '../../constants';
 
 export const SecretaryDashboard = ({ navigation }) => {
@@ -22,6 +23,27 @@ export const SecretaryDashboard = ({ navigation }) => {
 
     useEffect(() => {
         loadData();
+
+        // Suscribirse a cambios en citas en tiempo real para la secretaria (todas las citas)
+        const subscription = supabase
+            .channel('secretary-all-apts')
+            .on(
+                'postgres_changes',
+                {
+                    event: '*', // INSERT, UPDATE, DELETE
+                    schema: 'public',
+                    table: 'appointments',
+                },
+                () => {
+                    console.log('SecretaryDashboard: Cambio global en citas detectado, recargando...');
+                    loadData();
+                }
+            )
+            .subscribe();
+
+        return () => {
+            supabase.removeChannel(subscription);
+        };
     }, []);
 
     const loadData = async () => {

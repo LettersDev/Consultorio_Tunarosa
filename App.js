@@ -12,14 +12,18 @@ import { RegisterScreen } from './src/screens/auth/RegisterScreen';
 import { PatientDashboard } from './src/screens/patient/PatientDashboard';
 import { DoctorDashboard } from './src/screens/doctor/DoctorDashboard';
 import { SecretaryDashboard } from './src/screens/secretary/SecretaryDashboard';
+import { AdminDashboard } from './src/screens/admin/AdminDashboard';
 
 // Shared / Detail Screens
 import { PatientAppointmentsScreen } from './src/screens/patient/PatientAppointmentsScreen';
 import { PatientProfileScreen } from './src/screens/patient/PatientProfileScreen';
 import { BookAppointmentScreen } from './src/screens/patient/BookAppointmentScreen';
+import { NotificationsScreen } from './src/screens/patient/NotificationsScreen';
 import { DoctorPatientsScreen } from './src/screens/doctor/DoctorPatientsScreen';
 import { DoctorScheduleScreen } from './src/screens/doctor/DoctorScheduleScreen';
 import { PatientDetailScreen } from './src/screens/doctor/PatientDetailScreen';
+import { AddTreatmentScreen } from './src/screens/doctor/AddTreatmentScreen';
+import { AddPrescriptionScreen } from './src/screens/doctor/AddPrescriptionScreen';
 import { ManageAvailabilityScreen } from './src/screens/secretary/ManageAvailabilityScreen';
 import { AppointmentsOverviewScreen } from './src/screens/secretary/AppointmentsOverviewScreen';
 
@@ -34,6 +38,9 @@ export default function App() {
 
   useEffect(() => {
     console.log('App: Initializing auth check...');
+    let isMounted = true;
+    let lastUserId = null;
+
     checkUser();
 
     let authSubscription = null;
@@ -42,15 +49,25 @@ export default function App() {
       if (authService && typeof authService.onAuthStateChange === 'function') {
         const { data } = authService.onAuthStateChange(async (event, session) => {
           console.log('App: Auth state change event:', event);
+
+          // Skip if component unmounted or if it's the same user to prevent flickering
+          if (!isMounted) return;
+
+          const newUserId = session?.user?.id || null;
+          if (newUserId === lastUserId && event !== 'SIGNED_OUT') return;
+          lastUserId = newUserId;
+
           if (session?.user) {
-            setLoading(true);
             const { data: profile } = await authService.getUserProfile(session.user.id);
-            setUser(profile);
-            setCurrentScreen('Dashboard');
-            setLoading(false);
+            if (isMounted) {
+              setUser(profile);
+              setCurrentScreen('Dashboard');
+              setLoading(false);
+            }
           } else {
             setUser(null);
             setCurrentScreen('Auth_Login');
+            setLoading(false);
           }
         });
         authSubscription = data?.subscription;
@@ -62,6 +79,7 @@ export default function App() {
     }
 
     return () => {
+      isMounted = false;
       if (authSubscription) {
         authSubscription.unsubscribe();
       }
@@ -128,6 +146,7 @@ export default function App() {
       if (user?.role === 'patient') return <PatientDashboard navigation={nav} />;
       if (user?.role === 'doctor') return <DoctorDashboard navigation={nav} />;
       if (user?.role === 'secretary') return <SecretaryDashboard navigation={nav} />;
+      if (user?.role === 'admin') return <AdminDashboard navigation={nav} />;
       return <LoginScreen navigation={{ ...nav, navigate: (s) => navigate('Auth_Register') }} />;
     }
 
@@ -136,11 +155,14 @@ export default function App() {
     if (currentScreen === 'PatientAppointments') return <PatientAppointmentsScreen navigation={nav} />;
     if (currentScreen === 'PatientProfile') return <PatientProfileScreen navigation={nav} />;
     if (currentScreen === 'BookAppointment') return <BookAppointmentScreen navigation={nav} />;
+    if (currentScreen === 'Notifications') return <NotificationsScreen navigation={nav} />;
 
     // Doctor
     if (currentScreen === 'DoctorPatients') return <DoctorPatientsScreen navigation={nav} />;
     if (currentScreen === 'DoctorSchedule') return <DoctorScheduleScreen navigation={nav} />;
     if (currentScreen === 'PatientDetail') return <PatientDetailScreen navigation={nav} route={{ params: screenParams }} />;
+    if (currentScreen === 'AddTreatment') return <AddTreatmentScreen navigation={nav} route={{ params: screenParams }} />;
+    if (currentScreen === 'AddPrescription') return <AddPrescriptionScreen navigation={nav} route={{ params: screenParams }} />;
 
     // Secretary
     if (currentScreen === 'ManageAvailability') return <ManageAvailabilityScreen navigation={nav} />;

@@ -10,10 +10,12 @@ import {
     ActivityIndicator,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { supabase } from '../../../supabase.config';
 import { authService } from '../../services/authService';
 import { appointmentService } from '../../services/appointmentService';
 import { WhatsAppButton } from '../../components/WhatsAppButton';
 import { CustomButton } from '../../components/CustomButton';
+import { notificationService } from '../../services/notificationService';
 import { COLORS, APPOINTMENT_STATUS } from '../../constants';
 
 export const PatientDashboard = ({ navigation }) => {
@@ -21,10 +23,56 @@ export const PatientDashboard = ({ navigation }) => {
     const [appointments, setAppointments] = useState([]);
     const [loading, setLoading] = useState(true);
     const [refreshing, setRefreshing] = useState(false);
+    const [unreadCount, setUnreadCount] = useState(0);
 
     useEffect(() => {
         loadData();
-    }, []);
+        if (user?.id) {
+            notificationService.registerForPushNotifications(user.id);
+
+            // Suscribirse a nuevas notificaciones en tiempo real
+            const notifSub = supabase
+                .channel(`notifs-${user.id}`)
+                .on(
+                    'postgres_changes',
+                    {
+                        event: 'INSERT',
+                        schema: 'public',
+                        table: 'notifications',
+                        filter: `user_id=eq.${user.id}`,
+                    },
+                    () => {
+                        notificationService.getUnreadCount(user.id).then(res => {
+                            setUnreadCount(res.count || 0);
+                        });
+                    }
+                )
+                .subscribe();
+
+            // Suscribirse a cambios en citas en tiempo real
+            const appointmentSub = supabase
+                .channel(`patient-apts-${user.id}`)
+                .on(
+                    'postgres_changes',
+                    {
+                        event: '*', // Escuchar todo: INSERT, UPDATE, DELETE
+                        schema: 'public',
+                        table: 'appointments',
+                        filter: `patient_id=eq.${user.id}`,
+                    },
+                    () => {
+                        console.log('PatientDashboard: Cambio en citas detectado, recargando...');
+                        loadData();
+                    }
+                )
+                .subscribe();
+
+            return () => {
+                supabase.removeChannel(notifSub);
+                supabase.removeChannel(appointmentSub);
+            };
+        }
+    }, [user?.id]);
 
     const loadData = async () => {
         try {
@@ -33,8 +81,12 @@ export const PatientDashboard = ({ navigation }) => {
             console.log('PatientDashboard: User Data id:', userData?.id);
             if (userData && userData.id) {
                 setUser(userData);
-                const { data: appointmentsData } = await appointmentService.getPatientAppointments(userData.id);
-                setAppointments(appointmentsData || []);
+                const [appointmentsRes, notificationsRes] = await Promise.all([
+                    appointmentService.getPatientAppointments(userData.id),
+                    notificationService.getUnreadCount(userData.id)
+                ]);
+                setAppointments(appointmentsRes.data || []);
+                setUnreadCount(notificationsRes.count || 0);
             }
         } catch (error) {
             console.error('Error loading patient dashboard:', error);
@@ -130,7 +182,7 @@ export const PatientDashboard = ({ navigation }) => {
         const d = new Date();
         const today = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
         return appointments.filter(apt => {
-            return apt.date >= today && apt.status !== 'cancelled';
+            return apt.date >= today && apt.status !== 'cancelled' && apt.status !== 'completed';
         }).sort((a, b) => a.date.localeCompare(b.date) || (a.time || '').localeCompare(b.time || ''));
     }, [appointments]);
 
@@ -150,9 +202,22 @@ export const PatientDashboard = ({ navigation }) => {
                         <Text style={styles.greeting}>Hola,</Text>
                         <Text style={styles.userName}>{user?.name}</Text>
                     </View>
-                    <TouchableOpacity onPress={handleLogout} style={styles.logoutButton}>
-                        <Ionicons name="log-out-outline" size={24} color={COLORS.error} />
-                    </TouchableOpacity>
+                    <View style={styles.headerRight}>
+                        <TouchableOpacity
+                            onPress={() => navigation.navigate('Notifications')}
+                            style={styles.notificationButton}
+                        >
+                            <Ionicons name="notifications-outline" size={26} color={COLORS.primary} />
+                            {unreadCount > 0 && (
+                                <View style={styles.badge}>
+                                    <Text style={styles.badgeText}>{unreadCount > 9 ? '9+' : unreadCount}</Text>
+                                </View>
+                            )}
+                        </TouchableOpacity>
+                        <TouchableOpacity onPress={handleLogout} style={styles.logoutButton}>
+                            <Ionicons name="log-out-outline" size={24} color={COLORS.error} />
+                        </TouchableOpacity>
+                    </View>
                 </View>
                 <View style={styles.welcomeBanner}>
                     <Text style={styles.bannerText}>¿Cómo podemos ayudarte hoy?</Text>
@@ -314,6 +379,39 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         marginBottom: 20,
     },
+    headerRight: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 15,
+    },
+    notificationButton: {
+        width: 44,
+        height: 44,
+        borderRadius: 22,
+        backgroundColor: COLORS.primary + '10',
+        justifyContent: 'center',
+        alignItems: 'center',
+        position: 'relative',
+    },
+    badge: {
+        position: 'absolute',
+        top: 2,
+        right: 2,
+        backgroundColor: COLORS.error,
+        borderRadius: 10,
+        minWidth: 18,
+        height: 18,
+        justifyContent: 'center',
+        alignItems: 'center',
+        paddingHorizontal: 4,
+        borderWidth: 2,
+        borderColor: COLORS.surface,
+    },
+    badgeText: {
+        color: COLORS.white,
+        fontSize: 10,
+        fontWeight: '900',
+    },
     greeting: {
         fontSize: 16,
         color: COLORS.textSecondary,
@@ -372,41 +470,44 @@ const styles = StyleSheet.create({
     },
     appointmentCard: {
         backgroundColor: COLORS.surface,
-        borderRadius: 28,
+        borderRadius: 24,
         padding: 0,
-        borderLeftWidth: 8,
-        elevation: 6,
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 6 },
-        shadowOpacity: 0.08,
-        shadowRadius: 15,
+        borderLeftWidth: 0,
+        elevation: 8,
+        shadowColor: COLORS.primary,
+        shadowOffset: { width: 0, height: 8 },
+        shadowOpacity: 0.1,
+        shadowRadius: 16,
         overflow: 'hidden',
+        borderWidth: 1,
+        borderColor: COLORS.border + '50',
     },
     appointmentMain: {
         flexDirection: 'row',
-        padding: 20,
+        padding: 16,
         alignItems: 'center',
-        gap: 20,
+        gap: 16,
     },
     appointmentDateWidget: {
-        width: 60,
-        height: 65,
-        backgroundColor: COLORS.background,
-        borderRadius: 18,
+        width: 65,
+        height: 70,
+        backgroundColor: COLORS.primary + '08',
+        borderRadius: 20,
         justifyContent: 'center',
         alignItems: 'center',
         borderWidth: 1,
-        borderColor: COLORS.border,
+        borderColor: COLORS.primary + '20',
     },
     dateDay: {
-        fontSize: 22,
+        fontSize: 24,
         fontWeight: '900',
         color: COLORS.primary,
     },
     dateMonth: {
-        fontSize: 11,
+        fontSize: 12,
         fontWeight: '800',
-        color: COLORS.textSecondary,
+        color: COLORS.secondary,
+        textTransform: 'uppercase',
     },
     appointmentInfo: {
         flex: 1,
@@ -415,50 +516,54 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         justifyContent: 'space-between',
         alignItems: 'center',
-        marginBottom: 6,
+        marginBottom: 4,
         gap: 8,
     },
     doctorName: {
-        fontSize: 16,
-        fontWeight: '700',
+        fontSize: 17,
+        fontWeight: '800',
         color: COLORS.text,
         flex: 1,
     },
     statusBadge: {
-        paddingHorizontal: 8,
-        paddingVertical: 3,
-        borderRadius: 8,
+        paddingHorizontal: 10,
+        paddingVertical: 4,
+        borderRadius: 12,
     },
     statusText: {
         fontSize: 10,
-        fontWeight: '800',
+        fontWeight: '900',
         textTransform: 'uppercase',
+        letterSpacing: 0.5,
     },
     timeRow: {
         flexDirection: 'row',
         alignItems: 'center',
         gap: 6,
-        marginBottom: 6,
+        marginBottom: 4,
     },
     timeText: {
-        fontSize: 14,
+        fontSize: 15,
         color: COLORS.text,
-        fontWeight: '600',
+        fontWeight: '700',
     },
     reasonText: {
-        fontSize: 13,
+        fontSize: 14,
         color: COLORS.textSecondary,
+        fontStyle: 'italic',
     },
     cardActions: {
         flexDirection: 'row',
-        backgroundColor: COLORS.background,
+        backgroundColor: COLORS.background + '50',
         padding: 12,
         gap: 10,
+        borderTopWidth: 1,
+        borderColor: COLORS.border + '30',
     },
     cardActionBtn: {
         flex: 1,
-        height: 44,
-        borderRadius: 14,
+        height: 48,
+        borderRadius: 16,
     },
     mainActions: {
         paddingHorizontal: 20,

@@ -18,15 +18,37 @@ export const DoctorPatientsScreen = ({ navigation }) => {
 
     const fetchPatients = async () => {
         try {
+            // Get current doctor's ID
+            const { data: { user } } = await supabase.auth.getUser();
+            if (!user) return;
+
+            // Get unique patient IDs from appointments with this doctor
+            const { data: appointments, error: appError } = await supabase
+                .from('appointments')
+                .select('patient_id')
+                .eq('doctor_id', user.id);
+
+            if (appError) throw appError;
+
+            // Get unique patient IDs
+            const patientIds = [...new Set(appointments.map(a => a.patient_id))];
+
+            if (patientIds.length === 0) {
+                setPatients([]);
+                setFilteredPatients([]);
+                return;
+            }
+
+            // Fetch patient details
             const { data, error } = await supabase
                 .from('users')
                 .select('*')
-                .eq('role', 'patient')
+                .in('id', patientIds)
                 .order('name');
 
             if (error) throw error;
-            setPatients(data);
-            setFilteredPatients(data);
+            setPatients(data || []);
+            setFilteredPatients(data || []);
         } catch (error) {
             console.error('Error fetching patients:', error);
         } finally {

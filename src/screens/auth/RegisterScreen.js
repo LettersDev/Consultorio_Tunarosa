@@ -8,7 +8,7 @@ import {
     Platform,
     Alert,
 } from 'react-native';
-// import DateTimePicker from '@react-native-community/datetimepicker';
+import DateTimePicker from '@react-native-community/datetimepicker';
 import { CustomInput } from '../../components/CustomInput';
 import { CustomButton } from '../../components/CustomButton';
 import { authService } from '../../services/authService';
@@ -147,7 +147,7 @@ export const RegisterScreen = ({ navigation }) => {
                         style={styles.dateButton}
                     />
 
-                    {/* !!showDatePicker && (
+                    {showDatePicker && (
                         <DateTimePicker
                             value={formData.birthDate instanceof Date ? formData.birthDate : new Date()}
                             mode="date"
@@ -155,7 +155,7 @@ export const RegisterScreen = ({ navigation }) => {
                             onChange={onDateChange}
                             maximumDate={new Date()}
                         />
-                    ) */}
+                    )}
 
                     <CustomInput
                         label="Edad *"
@@ -167,12 +167,13 @@ export const RegisterScreen = ({ navigation }) => {
                     />
 
                     <CustomInput
-                        label="Teléfono *"
+                        label="Teléfono * (+58)"
                         value={formData.phone}
                         onChangeText={(value) => updateField('phone', value)}
-                        placeholder="8091234567"
+                        placeholder="4121234567"
                         keyboardType="phone-pad"
                         error={errors.phone}
+                        prefix="+58 "
                     />
 
                     <CustomInput

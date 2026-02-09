@@ -8,12 +8,15 @@ import {
     TouchableOpacity,
     Alert,
     ActivityIndicator,
+    Modal,
 } from 'react-native';
+import DateTimePicker from '@react-native-community/datetimepicker';
 import { Ionicons } from '@expo/vector-icons';
 import { authService } from '../../services/authService';
 import { appointmentService } from '../../services/appointmentService';
 import { WhatsAppButton } from '../../components/WhatsAppButton';
 import { CustomButton } from '../../components/CustomButton';
+import { supabase } from '../../../supabase.config';
 import { COLORS } from '../../constants';
 
 export const DoctorDashboard = ({ navigation }) => {
@@ -21,10 +24,39 @@ export const DoctorDashboard = ({ navigation }) => {
     const [appointments, setAppointments] = useState([]);
     const [loading, setLoading] = useState(true);
     const [refreshing, setRefreshing] = useState(false);
+    const [rescheduleModal, setRescheduleModal] = useState({ visible: false, appointmentId: null });
+    const [newDate, setNewDate] = useState(new Date());
+    const [showDatePicker, setShowDatePicker] = useState(false);
 
     useEffect(() => {
         loadData();
     }, []);
+
+    useEffect(() => {
+        if (user?.id) {
+            // Suscribirse a cambios en citas en tiempo real para este doctor
+            const subscription = supabase
+                .channel(`doctor-apts-${user.id}`)
+                .on(
+                    'postgres_changes',
+                    {
+                        event: '*', // INSERT, UPDATE, DELETE
+                        schema: 'public',
+                        table: 'appointments',
+                        filter: `doctor_id=eq.${user.id}`,
+                    },
+                    () => {
+                        console.log('DoctorDashboard: Cambio en citas detectado, recargando...');
+                        loadData();
+                    }
+                )
+                .subscribe();
+
+            return () => {
+                supabase.removeChannel(subscription);
+            };
+        }
+    }, [user?.id]);
 
     const loadData = async () => {
         try {
@@ -75,6 +107,64 @@ export const DoctorDashboard = ({ navigation }) => {
         );
     };
 
+    const handleCancel = async (appointmentId) => {
+        Alert.alert(
+            'Cancelar Cita',
+            '¿Está seguro que desea cancelar esta cita? Se notificará al paciente.',
+            [
+                { text: 'No', style: 'cancel' },
+                {
+                    text: 'Sí, cancelar',
+                    style: 'destructive',
+                    onPress: async () => {
+                        try {
+                            setLoading(true);
+                            const { error } = await appointmentService.cancelAppointment(appointmentId, user.id, 'Cancelada por el doctor');
+                            if (error) throw error;
+                            Alert.alert('Cita Cancelada', 'Se ha notificado al paciente.');
+                            await loadData();
+                        } catch (error) {
+                            console.error('Error cancelling appointment:', error);
+                            Alert.alert('Error', 'No se pudo cancelar la cita');
+                        } finally {
+                            setLoading(false);
+                        }
+                    },
+                },
+            ]
+        );
+    };
+
+    const openRescheduleModal = (appointmentId) => {
+        setNewDate(new Date());
+        setRescheduleModal({ visible: true, appointmentId });
+    };
+
+    const confirmReschedule = async () => {
+        try {
+            setLoading(true);
+            const dateStr = `${newDate.getFullYear()}-${String(newDate.getMonth() + 1).padStart(2, '0')}-${String(newDate.getDate()).padStart(2, '0')}`;
+            // Find the appointment to get its current time
+            const apt = appointments.find(a => a.id === rescheduleModal.appointmentId);
+            const { error } = await appointmentService.rescheduleAppointment(
+                rescheduleModal.appointmentId,
+                dateStr,
+                apt?.time || '09:00',
+                user.id,
+                'Reagendada por el doctor'
+            );
+            if (error) throw error;
+            setRescheduleModal({ visible: false, appointmentId: null });
+            Alert.alert('Éxito', 'Cita reagendada. Se ha notificado al paciente.');
+            await loadData();
+        } catch (error) {
+            console.error('Error rescheduling:', error);
+            Alert.alert('Error', 'No se pudo reagendar la cita');
+        } finally {
+            setLoading(false);
+        }
+    };
+
     const onRefresh = async () => {
         setRefreshing(true);
         await loadData();
@@ -84,14 +174,14 @@ export const DoctorDashboard = ({ navigation }) => {
     const todayAppointments = React.useMemo(() => {
         const d = new Date();
         const today = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-        return appointments.filter(apt => apt.date === today && apt.status !== 'cancelled')
+        return appointments.filter(apt => apt.date === today && apt.status !== 'cancelled' && apt.status !== 'completed')
             .sort((a, b) => (a.time || '').localeCompare(b.time || ''));
     }, [appointments]);
 
     const upcomingAppointments = React.useMemo(() => {
         const d = new Date();
         const today = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-        return appointments.filter(apt => apt.date > today && apt.status !== 'cancelled')
+        return appointments.filter(apt => apt.date > today && apt.status !== 'cancelled' && apt.status !== 'completed')
             .sort((a, b) => a.date.localeCompare(b.date) || (a.time || '').localeCompare(b.time || ''))
             .slice(0, 5);
     }, [appointments]);
@@ -206,12 +296,26 @@ export const DoctorDashboard = ({ navigation }) => {
                                             />
                                         )}
                                         <CustomButton
-                                            title="Atender Paciente"
+                                            title="Atender"
                                             onPress={() => navigation.navigate('PatientDetail', {
                                                 patientId: appointment.patient_id,
                                                 appointmentId: appointment.id
                                             })}
                                             style={styles.dashboardActionBtn}
+                                        />
+                                        <CustomButton
+                                            title="Reagendar"
+                                            onPress={() => openRescheduleModal(appointment.id)}
+                                            variant="outline"
+                                            style={[styles.dashboardActionBtn, { borderColor: COLORS.warning }]}
+                                            textStyle={{ color: COLORS.warning }}
+                                        />
+                                        <CustomButton
+                                            title="Cancelar"
+                                            onPress={() => handleCancel(appointment.id)}
+                                            variant="outline"
+                                            style={[styles.dashboardActionBtn, { borderColor: COLORS.error }]}
+                                            textStyle={{ color: COLORS.error }}
                                         />
                                     </View>
                                 </View>
@@ -224,30 +328,44 @@ export const DoctorDashboard = ({ navigation }) => {
                     <View style={styles.section}>
                         <Text style={styles.sectionTitle}>Próximas Citas</Text>
                         {upcomingAppointments.map((appointment) => (
-                            <TouchableOpacity
-                                key={appointment.id}
-                                style={styles.upcomingCard}
-                                onPress={() => navigation.navigate('PatientDetail', { patientId: appointment.patient_id })}
-                            >
-                                <View style={styles.upcomingDate}>
-                                    <Text style={styles.upcomingDay}>
-                                        {appointment.date.split('-')[2]}
-                                    </Text>
-                                    <Text style={styles.upcomingMonth}>
-                                        {new Date(appointment.date + 'T12:00:00').toLocaleDateString('es-ES', { month: 'short' }).toUpperCase()}
-                                    </Text>
-                                </View>
-                                <View style={styles.upcomingInfo}>
-                                    <Text style={styles.upcomingName}>{appointment.patient?.name}</Text>
-                                    <View style={styles.upcomingDetails}>
-                                        <Ionicons name="time-outline" size={14} color={COLORS.textSecondary} />
-                                        <Text style={styles.upcomingTime}>{appointment.time}</Text>
-                                        <View style={styles.separator} />
-                                        <Text style={styles.upcomingReason} numberOfLines={1}>{appointment.reason}</Text>
+                            <View key={appointment.id} style={styles.upcomingCard}>
+                                <TouchableOpacity
+                                    style={styles.upcomingCardContent}
+                                    onPress={() => navigation.navigate('PatientDetail', { patientId: appointment.patient_id })}
+                                >
+                                    <View style={styles.upcomingDate}>
+                                        <Text style={styles.upcomingDay}>
+                                            {appointment.date.split('-')[2]}
+                                        </Text>
+                                        <Text style={styles.upcomingMonth}>
+                                            {new Date(appointment.date + 'T12:00:00').toLocaleDateString('es-ES', { month: 'short' }).toUpperCase()}
+                                        </Text>
                                     </View>
+                                    <View style={styles.upcomingInfo}>
+                                        <Text style={styles.upcomingName}>{appointment.patient?.name}</Text>
+                                        <View style={styles.upcomingDetails}>
+                                            <Ionicons name="time-outline" size={14} color={COLORS.textSecondary} />
+                                            <Text style={styles.upcomingTime}>{appointment.time}</Text>
+                                            <View style={styles.separator} />
+                                            <Text style={styles.upcomingReason} numberOfLines={1}>{appointment.reason}</Text>
+                                        </View>
+                                    </View>
+                                </TouchableOpacity>
+                                <View style={styles.upcomingActions}>
+                                    <TouchableOpacity
+                                        style={styles.upcomingActionBtn}
+                                        onPress={() => openRescheduleModal(appointment.id)}
+                                    >
+                                        <Ionicons name="calendar-outline" size={18} color={COLORS.warning} />
+                                    </TouchableOpacity>
+                                    <TouchableOpacity
+                                        style={styles.upcomingActionBtn}
+                                        onPress={() => handleCancel(appointment.id)}
+                                    >
+                                        <Ionicons name="close-circle-outline" size={18} color={COLORS.error} />
+                                    </TouchableOpacity>
                                 </View>
-                                <Ionicons name="chevron-forward" size={20} color={COLORS.border} />
-                            </TouchableOpacity>
+                            </View>
                         ))}
                     </View>
                 )}
@@ -269,6 +387,59 @@ export const DoctorDashboard = ({ navigation }) => {
                 </View>
                 <View style={styles.footerSpacer} />
             </ScrollView>
+
+            {/* Reschedule Modal */}
+            <Modal
+                visible={rescheduleModal.visible}
+                transparent
+                animationType="slide"
+                onRequestClose={() => setRescheduleModal({ visible: false, appointmentId: null })}
+            >
+                <View style={styles.modalOverlay}>
+                    <View style={styles.modalContent}>
+                        <Text style={styles.modalTitle}>Reagendar Cita</Text>
+                        <Text style={styles.modalSubtitle}>Seleccione la nueva fecha:</Text>
+
+                        <TouchableOpacity
+                            style={styles.datePickerButton}
+                            onPress={() => setShowDatePicker(true)}
+                        >
+                            <Ionicons name="calendar" size={20} color={COLORS.primary} />
+                            <Text style={styles.datePickerText}>
+                                {newDate.toLocaleDateString('es-ES', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}
+                            </Text>
+                        </TouchableOpacity>
+
+                        {showDatePicker && (
+                            <DateTimePicker
+                                value={newDate}
+                                mode="date"
+                                display="default"
+                                minimumDate={new Date()}
+                                onChange={(event, selectedDate) => {
+                                    setShowDatePicker(false);
+                                    if (selectedDate) setNewDate(selectedDate);
+                                }}
+                            />
+                        )}
+
+                        <View style={styles.modalActions}>
+                            <CustomButton
+                                title="Cancelar"
+                                onPress={() => setRescheduleModal({ visible: false, appointmentId: null })}
+                                variant="outline"
+                                style={{ flex: 1, marginRight: 10 }}
+                            />
+                            <CustomButton
+                                title="Confirmar"
+                                onPress={confirmReschedule}
+                                loading={loading}
+                                style={{ flex: 1 }}
+                            />
+                        </View>
+                    </View>
+                </View>
+            </Modal>
         </View>
     );
 };
@@ -387,27 +558,29 @@ const styles = StyleSheet.create({
         backgroundColor: COLORS.surface,
         borderRadius: 24,
         padding: 0,
-        borderLeftWidth: 6,
-        elevation: 4,
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.05,
-        shadowRadius: 10,
+        borderLeftWidth: 0,
+        elevation: 6,
+        shadowColor: COLORS.primary,
+        shadowOffset: { width: 0, height: 6 },
+        shadowOpacity: 0.08,
+        shadowRadius: 12,
         overflow: 'hidden',
+        borderWidth: 1,
+        borderColor: COLORS.border + '50',
     },
     appointmentMain: {
         flexDirection: 'row',
         padding: 16,
         alignItems: 'center',
-        gap: 15,
+        gap: 12,
     },
     appointmentTime: {
         alignItems: 'center',
         justifyContent: 'center',
-        paddingRight: 15,
-        borderRightWidth: 1,
-        borderRightColor: COLORS.border,
-        minWidth: 70,
+        paddingRight: 12,
+        borderRightWidth: 1.5,
+        borderRightColor: COLORS.border + '80',
+        minWidth: 75,
     },
     timeText: {
         fontSize: 16,
@@ -525,6 +698,24 @@ const styles = StyleSheet.create({
         color: COLORS.textSecondary,
         flex: 1,
     },
+    upcomingCardContent: {
+        flex: 1,
+        flexDirection: 'row',
+        alignItems: 'center',
+    },
+    upcomingActions: {
+        flexDirection: 'row',
+        gap: 8,
+        marginLeft: 10,
+    },
+    upcomingActionBtn: {
+        width: 32,
+        height: 32,
+        borderRadius: 16,
+        backgroundColor: COLORS.background,
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
     quickActions: {
         flexDirection: 'row',
         paddingHorizontal: 20,
@@ -561,5 +752,51 @@ const styles = StyleSheet.create({
     },
     footerSpacer: {
         height: 40,
+    },
+    modalOverlay: {
+        flex: 1,
+        backgroundColor: 'rgba(0,0,0,0.5)',
+        justifyContent: 'center',
+        alignItems: 'center',
+        padding: 20,
+    },
+    modalContent: {
+        backgroundColor: COLORS.surface,
+        borderRadius: 25,
+        padding: 25,
+        width: '100%',
+        maxWidth: 400,
+    },
+    modalTitle: {
+        fontSize: 20,
+        fontWeight: '800',
+        color: COLORS.primary,
+        marginBottom: 8,
+        textAlign: 'center',
+    },
+    modalSubtitle: {
+        fontSize: 14,
+        color: COLORS.textSecondary,
+        marginBottom: 20,
+        textAlign: 'center',
+    },
+    datePickerButton: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: COLORS.background,
+        padding: 15,
+        borderRadius: 15,
+        gap: 10,
+        marginBottom: 20,
+    },
+    datePickerText: {
+        fontSize: 15,
+        fontWeight: '600',
+        color: COLORS.text,
+        textTransform: 'capitalize',
+    },
+    modalActions: {
+        flexDirection: 'row',
+        marginTop: 10,
     },
 });

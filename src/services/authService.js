@@ -142,4 +142,58 @@ export const authService = {
     onAuthStateChange(callback) {
         return supabase.auth.onAuthStateChange(callback);
     },
+
+    // Reset password (send email)
+    async resetPassword(email) {
+        try {
+            const { error } = await supabase.auth.resetPasswordForEmail(email, {
+                redirectTo: 'https://tunarosa.app/reset-password', // Placeholder URL
+            });
+            if (error) throw error;
+            return { error: null };
+        } catch (error) {
+            return { error };
+        }
+    },
+
+    // Create staff user (admin function)
+    async createStaffUser(email, password, userData) {
+        try {
+            const { data: authData, error: authError } = await supabase.auth.signUp({
+                email,
+                password,
+            });
+
+            if (authError) throw authError;
+
+            const { error: userError } = await supabase
+                .from('users')
+                .insert([{
+                    id: authData.user.id,
+                    email: userData.email,
+                    name: userData.name,
+                    phone: userData.phone || '',
+                    role: userData.role,
+                }]);
+
+            if (userError) throw userError;
+            return { data: authData, error: null };
+        } catch (error) {
+            return { data: null, error };
+        }
+    },
+
+    // Delete user (admin function - soft delete from users table)
+    async deleteUser(userId) {
+        try {
+            const { error } = await supabase
+                .from('users')
+                .delete()
+                .eq('id', userId);
+            if (error) throw error;
+            return { error: null };
+        } catch (error) {
+            return { error };
+        }
+    },
 };
