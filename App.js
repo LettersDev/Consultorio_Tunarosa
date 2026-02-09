@@ -162,7 +162,7 @@ export default function App() {
           <View style={styles.loadingContainer}>
             <ActivityIndicator animating={true} size="large" color={COLORS.primary} />
             <Text style={{ marginTop: 20, color: COLORS.primary, fontWeight: '700' }}>Iniciando aplicación...</Text>
-            <Text style={{ marginTop: 10, fontSize: 11, color: '#94a3b8' }}>v1.0.7 - Sync Final Stable</Text>
+            <Text style={{ marginTop: 10, fontSize: 11, color: '#94a3b8' }}>v1.0.8 - Final Git Sync</Text>
           </View>
         </PaperProvider>
       </SafeAreaProvider>
