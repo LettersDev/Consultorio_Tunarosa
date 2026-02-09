@@ -99,7 +99,9 @@ export const notificationService = {
                 sound: 'default',
                 title: title,
                 body: body,
-                data: { someData: 'goes here' },
+                priority: 'high', // WhatsApp style (Heads-up)
+                channelId: 'default',
+                data: { title, body },
             };
 
             await fetch('https://exp.host/--/api/v2/push/send', {

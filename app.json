@@ -3,6 +3,9 @@
     "name": "Dra. Tunarosa",
     "slug": "dra-tunarosa",
     "version": "1.0.0",
+    "runtimeVersion": {
+      "policy": "appVersion"
+    },
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
@@ -26,8 +29,16 @@
     "web": {
       "favicon": "./assets/favicon.png"
     },
+    "updates": {
+      "url": "https://u.expo.dev/3ebf64e3-9f5b-495f-94f8-7e8a88acc83b"
+    },
     "plugins": [
       "@react-native-community/datetimepicker"
-    ]
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "3ebf64e3-9f5b-495f-94f8-7e8a88acc83b"
+      }
+    }
   }
 }
