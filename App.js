@@ -85,8 +85,12 @@ export default function App() {
                 setLoading(false);
                 // Registrar para notificaciones push una vez tenemos el perfil
                 notificationService.registerForPushNotifications(session.user.id).then(token => {
-                  if (token && profile && !profile.push_token) {
-                    setUser({ ...profile, push_token: token });
+                  if (isMounted) {
+                    if (token) {
+                      setUser(prev => prev ? { ...prev, push_token: token } : profile);
+                    } else {
+                      console.log('App: No se pudo obtener el push token');
+                    }
                   }
                 });
               }
@@ -128,8 +132,8 @@ export default function App() {
           setCurrentScreen('Dashboard');
           // Registrar para notificaciones push
           notificationService.registerForPushNotifications(sessionUser.id).then(token => {
-            if (token && profile && !profile.push_token) {
-              setUser({ ...profile, push_token: token });
+            if (token) {
+              setUser(prev => prev ? { ...prev, push_token: token } : profile);
             }
           });
         } else {
@@ -162,7 +166,7 @@ export default function App() {
           <View style={styles.loadingContainer}>
             <ActivityIndicator animating={true} size="large" color={COLORS.primary} />
             <Text style={{ marginTop: 20, color: COLORS.primary, fontWeight: '700' }}>Iniciando aplicación...</Text>
-            <Text style={{ marginTop: 10, fontSize: 11, color: '#94a3b8' }}>v1.1.0 - Definitive Release</Text>
+            <Text style={{ marginTop: 10, fontSize: 11, color: '#94a3b8' }}>v1.2.0 - Push Activado</Text>
           </View>
         </PaperProvider>
       </SafeAreaProvider>
@@ -173,8 +177,18 @@ export default function App() {
   const goBack = () => navigate('Dashboard');
 
   const renderScreen = () => {
+    const registerPush = () => {
+      if (user?.id) {
+        notificationService.registerForPushNotifications(user.id).then(token => {
+          if (token) {
+            setUser(prev => prev ? { ...prev, push_token: token } : null);
+          }
+        });
+      }
+    };
+
     const nav = { navigate, goBack, logout };
-    const commonProps = { navigation: nav, user };
+    const commonProps = { navigation: nav, user, registerPush };
 
     // 1. Auth Flow
     if (currentScreen === 'Auth_Login') {

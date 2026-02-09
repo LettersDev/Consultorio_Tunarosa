@@ -213,7 +213,10 @@ export const PatientDashboard = ({ navigation, user: initialUser }) => {
                         <Text style={styles.userName}>{user?.name}</Text>
                     </View>
                     {Platform.OS !== 'web' && (
-                        <View style={[styles.statusBadge, { backgroundColor: user?.push_token ? '#ecfdf5' : '#fff1f2' }]}>
+                        <TouchableOpacity
+                            onPress={props.registerPush}
+                            style={[styles.statusBadge, { backgroundColor: user?.push_token ? '#ecfdf5' : '#fff1f2' }]}
+                        >
                             <Ionicons
                                 name={user?.push_token ? "notifications-outline" : "notifications-off-outline"}
                                 size={14}
@@ -222,7 +225,7 @@ export const PatientDashboard = ({ navigation, user: initialUser }) => {
                             <Text style={[styles.statusText, { color: user?.push_token ? "#059669" : "#e11d48" }]}>
                                 {user?.push_token ? "Push Activo" : "Push Inactivo"}
                             </Text>
-                        </View>
+                        </TouchableOpacity>
                     )}
                     <View style={styles.headerRight}>
                         <TouchableOpacity
