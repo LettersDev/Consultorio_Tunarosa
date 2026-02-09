@@ -36,6 +36,8 @@ yarn-error.*
 
 # Markdown artifacts
 *.md
+!README.md
+!SUPABASE_SETUP.md
 
 # generated native folders
 /ios

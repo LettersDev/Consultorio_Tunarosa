@@ -130,18 +130,29 @@ CREATE TABLE appointment_changes (
   created_at TIMESTAMP DEFAULT NOW()
 );
 
+-- Notifications table
+CREATE TABLE notifications (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  user_id UUID REFERENCES users(id) ON DELETE CASCADE,
+  title TEXT NOT NULL,
+  message TEXT NOT NULL,
+  read BOOLEAN DEFAULT FALSE,
+  created_at TIMESTAMP DEFAULT NOW()
+);
+
 -- Create indexes for better performance
 CREATE INDEX idx_appointments_patient ON appointments(patient_id);
 CREATE INDEX idx_appointments_doctor ON appointments(doctor_id);
 CREATE INDEX idx_appointments_date ON appointments(date);
 CREATE INDEX idx_availability_doctor_date ON availability(doctor_id, date);
 CREATE INDEX idx_treatments_patient ON treatments(patient_id);
+CREATE INDEX idx_notifications_user ON notifications(user_id);
 CREATE INDEX idx_dental_chart_patient ON dental_chart(patient_id);
 ```
 
 ## Paso 4: Configurar Row Level Security (RLS)
 
-Ejecuta estos comandos para habilitar RLS:
+Ejecuta estos comandos para habilitar RLS y configurar el acceso seguro:
 
 ```sql
 -- Enable RLS on all tables
@@ -153,63 +164,56 @@ ALTER TABLE dental_chart ENABLE ROW LEVEL SECURITY;
 ALTER TABLE prescriptions ENABLE ROW LEVEL SECURITY;
 ALTER TABLE payments ENABLE ROW LEVEL SECURITY;
 ALTER TABLE appointment_changes ENABLE ROW LEVEL SECURITY;
+ALTER TABLE notifications ENABLE ROW LEVEL SECURITY;
 
--- Users policies
+-- users: Staff can see everyone, patients only themselves
 CREATE POLICY "Users can view own profile" ON users FOR SELECT USING (auth.uid() = id);
+CREATE POLICY "Staff can view all users" ON users FOR SELECT 
+  USING (EXISTS (SELECT 1 FROM users WHERE id = auth.uid() AND role IN ('doctor', 'secretary', 'admin')));
 CREATE POLICY "Users can update own profile" ON users FOR UPDATE USING (auth.uid() = id);
 CREATE POLICY "Anyone can insert user on signup" ON users FOR INSERT WITH CHECK (true);
+CREATE POLICY "Admins can manage all users" ON users FOR ALL 
+  USING (EXISTS (SELECT 1 FROM users WHERE id = auth.uid() AND role = 'admin'));
 
--- Appointments policies
-CREATE POLICY "Patients can view own appointments" ON appointments FOR SELECT 
-  USING (patient_id = auth.uid());
-  
-CREATE POLICY "Doctors can view their appointments" ON appointments FOR SELECT 
-  USING (doctor_id = auth.uid());
-  
-CREATE POLICY "Secretaries can view all appointments" ON appointments FOR SELECT 
-  USING (EXISTS (SELECT 1 FROM users WHERE id = auth.uid() AND role = 'secretary'));
-  
-CREATE POLICY "Patients can create appointments" ON appointments FOR INSERT 
-  WITH CHECK (patient_id = auth.uid());
-  
-CREATE POLICY "Secretaries can manage appointments" ON appointments FOR ALL 
-  USING (EXISTS (SELECT 1 FROM users WHERE id = auth.uid() AND role = 'secretary'));
+-- appointments: Comprehensive access for staff
+CREATE POLICY "Patients view own appointments" ON appointments FOR SELECT USING (patient_id = auth.uid());
+CREATE POLICY "Staff can manage all appointments" ON appointments FOR ALL 
+  USING (EXISTS (SELECT 1 FROM users WHERE id = auth.uid() AND role IN ('doctor', 'secretary', 'admin')));
+CREATE POLICY "Patients can create appointments" ON appointments FOR INSERT WITH CHECK (patient_id = auth.uid());
 
--- Availability policies
+-- availability: Public view, Staff manage
 CREATE POLICY "Everyone can view availability" ON availability FOR SELECT USING (true);
-CREATE POLICY "Secretaries can manage availability" ON availability FOR ALL 
-  USING (EXISTS (SELECT 1 FROM users WHERE id = auth.uid() AND role = 'secretary'));
+CREATE POLICY "Staff can manage availability" ON availability FOR ALL 
+  USING (EXISTS (SELECT 1 FROM users WHERE id = auth.uid() AND role IN ('secretary', 'admin')));
 
--- Treatments policies
-CREATE POLICY "Patients can view own treatments" ON treatments FOR SELECT 
-  USING (patient_id = auth.uid());
-  
-CREATE POLICY "Doctors can view and manage treatments" ON treatments FOR ALL 
-  USING (doctor_id = auth.uid());
+-- clinical data: Patients view own, Doctors manage
+CREATE POLICY "Patients view own clinical data" ON treatments FOR SELECT USING (patient_id = auth.uid());
+CREATE POLICY "Staff view clinical data" ON treatments FOR SELECT 
+  USING (EXISTS (SELECT 1 FROM users WHERE id = auth.uid() AND role IN ('doctor', 'secretary', 'admin')));
+CREATE POLICY "Doctors/Admins manage treatments" ON treatments FOR ALL 
+  USING (EXISTS (SELECT 1 FROM users WHERE id = auth.uid() AND role IN ('doctor', 'admin')));
 
--- Dental chart policies
-CREATE POLICY "Patients can view own dental chart" ON dental_chart FOR SELECT 
-  USING (patient_id = auth.uid());
-  
-CREATE POLICY "Doctors can manage dental charts" ON dental_chart FOR ALL 
-  USING (EXISTS (SELECT 1 FROM users WHERE id = auth.uid() AND role = 'doctor'));
+-- dental_chart:
+CREATE POLICY "Patients view own chart" ON dental_chart FOR SELECT USING (patient_id = auth.uid());
+CREATE POLICY "Doctors/Admin manage charts" ON dental_chart FOR ALL 
+  USING (EXISTS (SELECT 1 FROM users WHERE id = auth.uid() AND role IN ('doctor', 'admin')));
 
--- Prescriptions policies
-CREATE POLICY "Patients can view own prescriptions" ON prescriptions FOR SELECT 
-  USING (patient_id = auth.uid());
-  
-CREATE POLICY "Doctors can manage prescriptions" ON prescriptions FOR ALL 
-  USING (doctor_id = auth.uid());
+-- prescriptions:
+CREATE POLICY "Patients view own prescriptions" ON prescriptions FOR SELECT USING (patient_id = auth.uid());
+CREATE POLICY "Doctors/Admin manage prescriptions" ON prescriptions FOR ALL 
+  USING (EXISTS (SELECT 1 FROM users WHERE id = auth.uid() AND role IN ('doctor', 'admin')));
 
--- Payments policies
-CREATE POLICY "Patients can view own payments" ON payments FOR SELECT 
-  USING (patient_id = auth.uid());
-  
-CREATE POLICY "Secretaries can view all payments" ON payments FOR SELECT 
-  USING (EXISTS (SELECT 1 FROM users WHERE id = auth.uid() AND role = 'secretary'));
-  
-CREATE POLICY "Secretaries can manage payments" ON payments FOR ALL 
-  USING (EXISTS (SELECT 1 FROM users WHERE id = auth.uid() AND role = 'secretary'));
+-- notifications:
+CREATE POLICY "Users view own notifications" ON notifications FOR SELECT USING (user_id = auth.uid());
+CREATE POLICY "Staff can notify patients" ON notifications FOR INSERT 
+  WITH CHECK (EXISTS (SELECT 1 FROM users WHERE id = auth.uid() AND role IN ('doctor', 'secretary', 'admin')));
+CREATE POLICY "Users mark own as read" ON notifications FOR UPDATE USING (user_id = auth.uid());
+
+-- appointment_changes:
+CREATE POLICY "Staff can view all changes" ON appointment_changes FOR SELECT 
+  USING (EXISTS (SELECT 1 FROM users WHERE id = auth.uid() AND role IN ('doctor', 'secretary', 'admin')));
+CREATE POLICY "Staff can log changes" ON appointment_changes FOR INSERT 
+  WITH CHECK (EXISTS (SELECT 1 FROM users WHERE id = auth.uid() AND role IN ('doctor', 'secretary', 'admin')));
 ```
 
 ## Paso 5: Crear Cuentas de Doctor y Secretaria
