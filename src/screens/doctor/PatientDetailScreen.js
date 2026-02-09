@@ -123,7 +123,7 @@ export const PatientDetailScreen = ({ route, navigation }) => {
         );
     };
 
-    if (loading) {
+    if (loading && !patient) {
         return (
             <View style={styles.centerContainer}>
                 <ActivityIndicator animating={true} size="large" color={COLORS.primary} />

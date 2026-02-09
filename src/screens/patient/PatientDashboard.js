@@ -18,8 +18,8 @@ import { CustomButton } from '../../components/CustomButton';
 import { notificationService } from '../../services/notificationService';
 import { COLORS, APPOINTMENT_STATUS } from '../../constants';
 
-export const PatientDashboard = ({ navigation }) => {
-    const [user, setUser] = useState(null);
+export const PatientDashboard = ({ navigation, user: initialUser }) => {
+    const [user, setUser] = useState(initialUser);
     const [appointments, setAppointments] = useState([]);
     const [loading, setLoading] = useState(true);
     const [refreshing, setRefreshing] = useState(false);
@@ -77,13 +77,23 @@ export const PatientDashboard = ({ navigation }) => {
     const loadData = async () => {
         try {
             setLoading(true);
-            const { data: userData } = await authService.getCurrentUser();
-            console.log('PatientDashboard: User Data id:', userData?.id);
-            if (userData && userData.id) {
-                setUser(userData);
+
+            let currentUserId = user?.id || initialUser?.id;
+
+            if (!currentUserId) {
+                const { data: userData } = await authService.getCurrentUser();
+                if (userData) {
+                    setUser(userData);
+                    currentUserId = userData.id;
+                }
+            } else if (!user && initialUser) {
+                setUser(initialUser);
+            }
+
+            if (currentUserId) {
                 const [appointmentsRes, notificationsRes] = await Promise.all([
-                    appointmentService.getPatientAppointments(userData.id),
-                    notificationService.getUnreadCount(userData.id)
+                    appointmentService.getPatientAppointments(currentUserId),
+                    notificationService.getUnreadCount(currentUserId)
                 ]);
                 setAppointments(appointmentsRes.data || []);
                 setUnreadCount(notificationsRes.count || 0);
@@ -186,7 +196,7 @@ export const PatientDashboard = ({ navigation }) => {
         }).sort((a, b) => a.date.localeCompare(b.date) || (a.time || '').localeCompare(b.time || ''));
     }, [appointments]);
 
-    if (loading) {
+    if (loading && !user && appointments.length === 0) {
         return (
             <View style={styles.centerContainer}>
                 <ActivityIndicator animating={true} size="large" color={COLORS.primary} />

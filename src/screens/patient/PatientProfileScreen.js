@@ -7,9 +7,9 @@ import { treatmentService } from '../../services/treatmentService';
 import { COLORS } from '../../constants';
 import { CustomButton } from '../../components/CustomButton';
 
-export const PatientProfileScreen = ({ navigation }) => {
-    const [user, setUser] = useState(null);
-    const [patientData, setPatientData] = useState(null);
+export const PatientProfileScreen = ({ navigation, user: initialUser }) => {
+    const [user, setUser] = useState(initialUser);
+    const [patientData, setPatientData] = useState(initialUser);
     const [treatments, setTreatments] = useState([]);
     const [loading, setLoading] = useState(true);
 
@@ -19,13 +19,23 @@ export const PatientProfileScreen = ({ navigation }) => {
 
     const loadData = async () => {
         try {
-            const { data: currentUser } = await authService.getCurrentUser();
-            if (currentUser) {
-                setUser(currentUser);
-                setPatientData(currentUser);
+            let currentUserId = user?.id || initialUser?.id;
 
+            if (!currentUserId) {
+                const { data: currentUser } = await authService.getCurrentUser();
+                if (currentUser) {
+                    setUser(currentUser);
+                    setPatientData(currentUser);
+                    currentUserId = currentUser.id;
+                }
+            } else if (!user && initialUser) {
+                setUser(initialUser);
+                setPatientData(initialUser);
+            }
+
+            if (currentUserId) {
                 // Fetch treatment history
-                const { data: history } = await treatmentService.getPatientTreatments(currentUser.id);
+                const { data: history } = await treatmentService.getPatientTreatments(currentUserId);
                 setTreatments(history || []);
             }
         } catch (error) {
@@ -64,7 +74,7 @@ export const PatientProfileScreen = ({ navigation }) => {
         />
     );
 
-    if (loading) {
+    if (loading && !patientData) {
         return (
             <View style={styles.centerContainer}>
                 <ActivityIndicator animating={true} size="large" color={COLORS.primary} />

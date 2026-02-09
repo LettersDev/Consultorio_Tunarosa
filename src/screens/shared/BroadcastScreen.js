@@ -8,6 +8,7 @@ import {
     ActivityIndicator,
     KeyboardAvoidingView,
     Platform,
+    TouchableOpacity,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { notificationService } from '../../services/notificationService';
@@ -126,9 +127,6 @@ export const BroadcastScreen = ({ navigation }) => {
         </KeyboardAvoidingView>
     );
 };
-
-// Import inline to fix TouchableOpacity issue if needed
-import { TouchableOpacity } from 'react-native';
 
 const styles = StyleSheet.create({
     container: {

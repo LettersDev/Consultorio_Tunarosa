@@ -12,11 +12,12 @@ import { Ionicons } from '@expo/vector-icons';
 import { authService } from '../../services/authService';
 import { appointmentService } from '../../services/appointmentService';
 import { CustomButton } from '../../components/CustomButton';
+import { Badge, ActivityIndicator } from 'react-native-paper';
 import { supabase } from '../../../supabase.config';
 import { COLORS } from '../../constants';
 
-export const SecretaryDashboard = ({ navigation }) => {
-    const [user, setUser] = useState(null);
+export const SecretaryDashboard = ({ navigation, user: initialUser }) => {
+    const [user, setUser] = useState(initialUser);
     const [appointments, setAppointments] = useState([]);
     const [loading, setLoading] = useState(true);
     const [refreshing, setRefreshing] = useState(false);
@@ -36,7 +37,7 @@ export const SecretaryDashboard = ({ navigation }) => {
                 },
                 () => {
                     console.log('SecretaryDashboard: Cambio global en citas detectado, recargando...');
-                    loadData();
+                    loadData(true); // Carga silenciosa
                 }
             )
             .subscribe();
@@ -46,21 +47,31 @@ export const SecretaryDashboard = ({ navigation }) => {
         };
     }, []);
 
-    const loadData = async () => {
+    const loadData = async (silent = false) => {
         try {
-            setLoading(true);
-            // Parallel fetching
-            const [userResult, appointmentsResult] = await Promise.all([
-                authService.getCurrentUser(),
-                appointmentService.getAllAppointments()
-            ]);
+            if (!silent) setLoading(true);
 
-            if (userResult.data) setUser(userResult.data);
-            if (appointmentsResult.data) setAppointments(appointmentsResult.data);
+            // Fetch everything in parallel to be faster
+            const tasks = [appointmentService.getAllAppointments()];
+
+            // Only fetch user if we don't have it yet
+            if (!user && !initialUser) {
+                tasks.push(authService.getCurrentUser());
+            }
+
+            const results = await Promise.all(tasks);
+
+            if (results[0].data) setAppointments(results[0].data);
+
+            if (results[1]?.data) {
+                setUser(results[1].data);
+            } else if (!user && initialUser) {
+                setUser(initialUser);
+            }
         } catch (error) {
             console.error('Error loading secretary dashboard data:', error);
         } finally {
-            setLoading(false);
+            if (!silent) setLoading(false);
         }
     };
 
@@ -70,7 +81,7 @@ export const SecretaryDashboard = ({ navigation }) => {
             const { error } = await appointmentService.confirmAppointment(appointmentId);
             if (error) throw error;
             Alert.alert('Éxito', 'Cita confirmada correctamente');
-            await loadData();
+            await loadData(true); // Recarga silenciosa
         } catch (error) {
             console.error('Error confirming appointment:', error);
             Alert.alert('Error', 'No se pudo confirmar la cita');
@@ -118,7 +129,7 @@ export const SecretaryDashboard = ({ navigation }) => {
 
     const todayAppointments = stats.todayApts;
 
-    if (loading) {
+    if (loading && appointments.length === 0) {
         return (
             <View style={styles.centerContainer}>
                 <ActivityIndicator animating={true} size="large" color={COLORS.primary} />
@@ -254,22 +265,22 @@ export const SecretaryDashboard = ({ navigation }) => {
                         style={styles.quickActionBtn}
                         icon="list-outline"
                     />
-                    <CustomButton
-                        title="Anuncios"
-                        onPress={() => navigation.navigate('Shared_Broadcast')}
-                        style={styles.quickActionBtn}
-                        variant="secondary"
-                        icon="megaphone-outline"
-                    />
+                    {/* El botón de anuncios en su propia fila dentro del wrap */}
+                    <View style={{ width: '100%', marginTop: 5 }}>
+                        <CustomButton
+                            title="Anuncios y Difusiones"
+                            onPress={() => navigation.navigate('Shared_Broadcast')}
+                            style={styles.fullWidthBtn}
+                            variant="secondary"
+                            icon="megaphone-outline"
+                        />
+                    </View>
                 </View>
                 <View style={styles.footerSpacer} />
             </ScrollView>
         </View>
     );
 };
-
-// Re-import missing components for the new design
-import { Badge, ActivityIndicator } from 'react-native-paper';
 
 const styles = StyleSheet.create({
     container: {
@@ -456,12 +467,19 @@ const styles = StyleSheet.create({
     },
     quickActions: {
         flexDirection: 'row',
+        flexWrap: 'wrap',
         paddingHorizontal: 20,
         gap: 12,
         marginBottom: 20,
+        justifyContent: 'space-between',
     },
     quickActionBtn: {
         flex: 1,
+        minWidth: '45%',
+        borderRadius: 16,
+    },
+    fullWidthBtn: {
+        width: '100%',
         borderRadius: 16,
     },
     emptyState: {

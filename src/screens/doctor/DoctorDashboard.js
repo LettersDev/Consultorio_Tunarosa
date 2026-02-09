@@ -12,6 +12,7 @@ import {
 } from 'react-native';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { Ionicons } from '@expo/vector-icons';
+import { Badge } from 'react-native-paper';
 import { authService } from '../../services/authService';
 import { appointmentService } from '../../services/appointmentService';
 import { WhatsAppButton } from '../../components/WhatsAppButton';
@@ -19,8 +20,8 @@ import { CustomButton } from '../../components/CustomButton';
 import { supabase } from '../../../supabase.config';
 import { COLORS } from '../../constants';
 
-export const DoctorDashboard = ({ navigation }) => {
-    const [user, setUser] = useState(null);
+export const DoctorDashboard = ({ navigation, user: initialUser }) => {
+    const [user, setUser] = useState(initialUser);
     const [appointments, setAppointments] = useState([]);
     const [loading, setLoading] = useState(true);
     const [refreshing, setRefreshing] = useState(false);
@@ -47,7 +48,7 @@ export const DoctorDashboard = ({ navigation }) => {
                     },
                     () => {
                         console.log('DoctorDashboard: Cambio en citas detectado, recargando...');
-                        loadData();
+                        loadData(true); // Carga silenciosa para cambios en tiempo real
                     }
                 )
                 .subscribe();
@@ -58,21 +59,31 @@ export const DoctorDashboard = ({ navigation }) => {
         }
     }, [user?.id]);
 
-    const loadData = async () => {
+    const loadData = async (silent = false) => {
         try {
-            setLoading(true);
-            const { data: userData } = await authService.getCurrentUser();
-            if (userData) {
-                setUser(userData);
-                // Fetch appointments in parallel with user check if possible, 
-                // but here data depends on userData.id
-                const { data: appointmentsData } = await appointmentService.getDoctorAppointments(userData.id);
+            if (!silent) setLoading(true);
+
+            // Reutilizar el usuario si ya lo tenemos para ser más rápidos
+            let currentUserId = user?.id || initialUser?.id;
+
+            if (!currentUserId) {
+                const { data: userData } = await authService.getCurrentUser();
+                if (userData) {
+                    setUser(userData);
+                    currentUserId = userData.id;
+                }
+            } else if (!user && initialUser) {
+                setUser(initialUser);
+            }
+
+            if (currentUserId) {
+                const { data: appointmentsData } = await appointmentService.getDoctorAppointments(currentUserId);
                 setAppointments(appointmentsData || []);
             }
         } catch (error) {
             console.error('Error loading dashboard data:', error);
         } finally {
-            setLoading(false);
+            if (!silent) setLoading(false);
         }
     };
 
@@ -82,7 +93,7 @@ export const DoctorDashboard = ({ navigation }) => {
             const { error } = await appointmentService.confirmAppointment(appointmentId);
             if (error) throw error;
             Alert.alert('Éxito', 'Cita confirmada correctamente');
-            await loadData();
+            await loadData(true); // Recarga silenciosa tras acción
         } catch (error) {
             console.error('Error confirming appointment:', error);
             Alert.alert('Error', 'No se pudo confirmar la cita');
@@ -122,7 +133,7 @@ export const DoctorDashboard = ({ navigation }) => {
                             const { error } = await appointmentService.cancelAppointment(appointmentId, user.id, 'Cancelada por el doctor');
                             if (error) throw error;
                             Alert.alert('Cita Cancelada', 'Se ha notificado al paciente.');
-                            await loadData();
+                            await loadData(true); // Recarga silenciosa
                         } catch (error) {
                             console.error('Error cancelling appointment:', error);
                             Alert.alert('Error', 'No se pudo cancelar la cita');
@@ -156,7 +167,7 @@ export const DoctorDashboard = ({ navigation }) => {
             if (error) throw error;
             setRescheduleModal({ visible: false, appointmentId: null });
             Alert.alert('Éxito', 'Cita reagendada. Se ha notificado al paciente.');
-            await loadData();
+            await loadData(true); // Recarga silenciosa
         } catch (error) {
             console.error('Error rescheduling:', error);
             Alert.alert('Error', 'No se pudo reagendar la cita');
@@ -385,13 +396,16 @@ export const DoctorDashboard = ({ navigation }) => {
                         style={styles.quickActionBtn}
                         icon="calendar-outline"
                     />
-                    <CustomButton
-                        title="Anuncios"
-                        onPress={() => navigation.navigate('Shared_Broadcast')}
-                        style={styles.quickActionBtn}
-                        variant="secondary"
-                        icon="megaphone-outline"
-                    />
+                    {/* El botón de anuncios en su propia fila dentro del wrap */}
+                    <View style={{ width: '100%', marginTop: 5 }}>
+                        <CustomButton
+                            title="Anuncios"
+                            onPress={() => navigation.navigate('Shared_Broadcast')}
+                            style={styles.fullWidthBtn}
+                            variant="secondary"
+                            icon="megaphone-outline"
+                        />
+                    </View>
                 </View>
                 <View style={styles.footerSpacer} />
             </ScrollView>
@@ -451,9 +465,6 @@ export const DoctorDashboard = ({ navigation }) => {
         </View>
     );
 };
-
-// Re-import missing components for the new design
-import { Badge } from 'react-native-paper';
 
 const styles = StyleSheet.create({
     container: {
@@ -732,12 +743,19 @@ const styles = StyleSheet.create({
     },
     quickActions: {
         flexDirection: 'row',
+        flexWrap: 'wrap',
         paddingHorizontal: 20,
         gap: 12,
         marginBottom: 20,
+        justifyContent: 'space-between',
     },
     quickActionBtn: {
         flex: 1,
+        minWidth: '45%',
+        borderRadius: 16,
+    },
+    fullWidthBtn: {
+        width: '100%',
         borderRadius: 16,
     },
     emptyState: {

@@ -7,7 +7,7 @@ import { authService } from '../../services/authService';
 import { COLORS, APPOINTMENT_STATUS } from '../../constants';
 import { CustomButton } from '../../components/CustomButton';
 
-export const PatientAppointmentsScreen = ({ navigation }) => {
+export const PatientAppointmentsScreen = ({ navigation, user }) => {
     const theme = useTheme();
     const [appointments, setAppointments] = useState([]);
     const [loading, setLoading] = useState(true);
@@ -15,9 +15,9 @@ export const PatientAppointmentsScreen = ({ navigation }) => {
 
     const loadAppointments = useCallback(async () => {
         try {
-            const { data: user } = await authService.getCurrentUser();
-            if (user) {
-                const { data, error } = await appointmentService.getPatientAppointments(user.id);
+            const currentUserId = user?.id;
+            if (currentUserId) {
+                const { data, error } = await appointmentService.getPatientAppointments(currentUserId);
                 if (error) throw error;
                 // Sort by date and time
                 const sorted = (data || []).sort((a, b) => b.date.localeCompare(a.date) || (b.time || '').localeCompare(a.time || ''));
@@ -144,7 +144,7 @@ export const PatientAppointmentsScreen = ({ navigation }) => {
         </Card>
     );
 
-    if (loading) {
+    if (loading && appointments.length === 0) {
         return (
             <View style={styles.centerContainer}>
                 <ActivityIndicator size="large" color={COLORS.primary} />

@@ -97,16 +97,24 @@ export default function App() {
   const checkUser = async () => {
     try {
       setLoading(true);
-      const result = await authService.getSession();
-      if (result?.data?.session?.user) {
-        const { data: profile } = await authService.getUserProfile(result.data.session.user.id);
-        setUser(profile);
-        setCurrentScreen('Dashboard');
+      const { data: sessionData } = await authService.getSession();
+      const sessionUser = sessionData?.session?.user;
+
+      if (sessionUser) {
+        // Fetch profile immediately to avoid extra loading cycles
+        const { data: profile } = await authService.getUserProfile(sessionUser.id);
+        if (profile) {
+          setUser(profile);
+          setCurrentScreen('Dashboard');
+        } else {
+          setCurrentScreen('Auth_Login');
+        }
       } else {
         setCurrentScreen('Auth_Login');
       }
     } catch (error) {
       console.error('Auth error:', error);
+      setCurrentScreen('Auth_Login');
     } finally {
       setLoading(false);
     }
@@ -140,6 +148,7 @@ export default function App() {
 
   const renderScreen = () => {
     const nav = { navigate, goBack, logout };
+    const commonProps = { navigation: nav, user };
 
     // 1. Auth Flow
     if (currentScreen === 'Auth_Login') {
@@ -151,31 +160,31 @@ export default function App() {
 
     // 2. Dashboards (Role-based)
     if (currentScreen === 'Dashboard') {
-      if (user?.role === 'patient') return <PatientDashboard navigation={nav} />;
-      if (user?.role === 'doctor') return <DoctorDashboard navigation={nav} />;
-      if (user?.role === 'secretary') return <SecretaryDashboard navigation={nav} />;
-      if (user?.role === 'admin') return <AdminDashboard navigation={nav} />;
+      if (user?.role === 'patient') return <PatientDashboard {...commonProps} />;
+      if (user?.role === 'doctor') return <DoctorDashboard {...commonProps} />;
+      if (user?.role === 'secretary') return <SecretaryDashboard {...commonProps} />;
+      if (user?.role === 'admin') return <AdminDashboard {...commonProps} />;
       return <LoginScreen navigation={{ ...nav, navigate: (s) => navigate('Auth_Register') }} />;
     }
 
     // 3. Sub-screens
     // Patient
-    if (currentScreen === 'PatientAppointments') return <PatientAppointmentsScreen navigation={nav} />;
-    if (currentScreen === 'PatientProfile') return <PatientProfileScreen navigation={nav} />;
-    if (currentScreen === 'BookAppointment') return <BookAppointmentScreen navigation={nav} />;
-    if (currentScreen === 'Notifications') return <NotificationsScreen navigation={nav} />;
+    if (currentScreen === 'PatientAppointments') return <PatientAppointmentsScreen {...commonProps} />;
+    if (currentScreen === 'PatientProfile') return <PatientProfileScreen {...commonProps} />;
+    if (currentScreen === 'BookAppointment') return <BookAppointmentScreen {...commonProps} />;
+    if (currentScreen === 'Notifications') return <NotificationsScreen {...commonProps} />;
 
     // Doctor
-    if (currentScreen === 'DoctorPatients') return <DoctorPatientsScreen navigation={nav} />;
-    if (currentScreen === 'DoctorSchedule') return <DoctorScheduleScreen navigation={nav} />;
-    if (currentScreen === 'PatientDetail') return <PatientDetailScreen navigation={nav} route={{ params: screenParams }} />;
-    if (currentScreen === 'AddTreatment') return <AddTreatmentScreen navigation={nav} route={{ params: screenParams }} />;
-    if (currentScreen === 'AddPrescription') return <AddPrescriptionScreen navigation={nav} route={{ params: screenParams }} />;
+    if (currentScreen === 'DoctorPatients') return <DoctorPatientsScreen {...commonProps} />;
+    if (currentScreen === 'DoctorSchedule') return <DoctorScheduleScreen {...commonProps} />;
+    if (currentScreen === 'PatientDetail') return <PatientDetailScreen {...commonProps} route={{ params: screenParams }} />;
+    if (currentScreen === 'AddTreatment') return <AddTreatmentScreen {...commonProps} route={{ params: screenParams }} />;
+    if (currentScreen === 'AddPrescription') return <AddPrescriptionScreen {...commonProps} route={{ params: screenParams }} />;
 
     // Secretary
-    if (currentScreen === 'ManageAvailability') return <ManageAvailabilityScreen navigation={nav} />;
-    if (currentScreen === 'AppointmentsOverview') return <AppointmentsOverviewScreen navigation={nav} />;
-    if (currentScreen === 'Shared_Broadcast') return <BroadcastScreen navigation={nav} />;
+    if (currentScreen === 'ManageAvailability') return <ManageAvailabilityScreen {...commonProps} />;
+    if (currentScreen === 'AppointmentsOverview') return <AppointmentsOverviewScreen {...commonProps} />;
+    if (currentScreen === 'Shared_Broadcast') return <BroadcastScreen {...commonProps} />;
 
     return <View />;
   };

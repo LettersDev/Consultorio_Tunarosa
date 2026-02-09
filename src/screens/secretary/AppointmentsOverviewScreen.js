@@ -163,7 +163,7 @@ export const AppointmentsOverviewScreen = ({ navigation }) => {
                 style={styles.searchBar}
             />
 
-            {loading ? (
+            {loading && filteredAppointments.length === 0 ? (
                 <View style={styles.centerContainer}>
                     <ActivityIndicator animating={true} size="large" color={COLORS.primary} />
                 </View>

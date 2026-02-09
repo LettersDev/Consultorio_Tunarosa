@@ -6,11 +6,12 @@ import { supabase } from '../../../supabase.config';
 import { COLORS } from '../../constants';
 import { CustomButton } from '../../components/CustomButton';
 
-export const DoctorPatientsScreen = ({ navigation }) => {
+export const DoctorPatientsScreen = ({ navigation, user: initialUser }) => {
     const [patients, setPatients] = useState([]);
     const [searchQuery, setSearchQuery] = useState('');
     const [loading, setLoading] = useState(true);
     const [filteredPatients, setFilteredPatients] = useState([]);
+    const [user, setUser] = useState(initialUser);
 
     useEffect(() => {
         fetchPatients();
@@ -18,9 +19,14 @@ export const DoctorPatientsScreen = ({ navigation }) => {
 
     const fetchPatients = async () => {
         try {
-            // Get current doctor's ID
-            const { data: { user } } = await supabase.auth.getUser();
-            if (!user) return;
+            // Get current doctor's ID from state or props
+            let currentUserId = user?.id || initialUser?.id;
+
+            if (!currentUserId) {
+                const { data: { user: authUser } } = await supabase.auth.getUser();
+                if (!authUser) return;
+                currentUserId = authUser.id;
+            }
 
             // Get unique patient IDs from appointments with this doctor
             const { data: appointments, error: appError } = await supabase
@@ -105,7 +111,7 @@ export const DoctorPatientsScreen = ({ navigation }) => {
                 />
             </View>
 
-            {loading ? (
+            {loading && filteredPatients.length === 0 ? (
                 <View style={styles.centerContainer}>
                     <ActivityIndicator animating={true} size="large" color={COLORS.primary} />
                 </View>
