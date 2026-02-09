@@ -8,6 +8,7 @@ import {
     TouchableOpacity,
     Alert,
     ActivityIndicator,
+    Platform,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { supabase } from '../../../supabase.config';
@@ -18,7 +19,7 @@ import { CustomButton } from '../../components/CustomButton';
 import { notificationService } from '../../services/notificationService';
 import { COLORS, APPOINTMENT_STATUS } from '../../constants';
 
-export const PatientDashboard = ({ navigation, user: initialUser }) => {
+export const PatientDashboard = ({ navigation, user: initialUser, registerPush }) => {
     const [user, setUser] = useState(initialUser);
     const [appointments, setAppointments] = useState([]);
     const [loading, setLoading] = useState(true);
@@ -61,7 +62,7 @@ export const PatientDashboard = ({ navigation, user: initialUser }) => {
                         filter: `patient_id=eq.${user.id}`,
                     },
                     () => {
-                        console.log('PatientDashboard: Cambio en citas detectado, recargando...');
+
                         loadData();
                     }
                 )
@@ -212,21 +213,7 @@ export const PatientDashboard = ({ navigation, user: initialUser }) => {
                         <Text style={styles.greeting}>Hola,</Text>
                         <Text style={styles.userName}>{user?.name}</Text>
                     </View>
-                    {Platform.OS !== 'web' && (
-                        <TouchableOpacity
-                            onPress={props.registerPush}
-                            style={[styles.statusBadge, { backgroundColor: user?.push_token ? '#ecfdf5' : '#fff1f2' }]}
-                        >
-                            <Ionicons
-                                name={user?.push_token ? "notifications-outline" : "notifications-off-outline"}
-                                size={14}
-                                color={user?.push_token ? "#059669" : "#e11d48"}
-                            />
-                            <Text style={[styles.statusText, { color: user?.push_token ? "#059669" : "#e11d48" }]}>
-                                {user?.push_token ? "Push Activo" : "Push Inactivo"}
-                            </Text>
-                        </TouchableOpacity>
-                    )}
+
                     <View style={styles.headerRight}>
                         <TouchableOpacity
                             onPress={() => navigation.navigate('Notifications')}

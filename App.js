@@ -41,7 +41,7 @@ export default function App() {
   const [initError, setInitError] = useState(null);
 
   useEffect(() => {
-    console.log('App: Initializing auth check...');
+
     let isMounted = true;
     let lastUserId = null;
 
@@ -83,16 +83,16 @@ export default function App() {
                 setUser(profile);
                 setCurrentScreen('Dashboard');
                 setLoading(false);
-                // Registrar para notificaciones push una vez tenemos el perfil
-                notificationService.registerForPushNotifications(session.user.id).then(token => {
-                  if (isMounted) {
-                    if (token) {
+                // Registrar para notificaciones push una vez tenemos el perfil (NON-BLOCKING)
+                notificationService.registerForPushNotifications(session.user.id)
+                  .then(token => {
+                    if (isMounted && token) {
                       setUser(prev => prev ? { ...prev, push_token: token } : profile);
-                    } else {
-                      console.log('App: No se pudo obtener el push token');
                     }
-                  }
-                });
+                  })
+                  .catch(err => {
+                    console.log('App: Push registration failed silently:', err.message);
+                  });
               }
             } else {
               setUser(null);
@@ -130,12 +130,16 @@ export default function App() {
         if (profile) {
           setUser(profile);
           setCurrentScreen('Dashboard');
-          // Registrar para notificaciones push
-          notificationService.registerForPushNotifications(sessionUser.id).then(token => {
-            if (token) {
-              setUser(prev => prev ? { ...prev, push_token: token } : profile);
-            }
-          });
+          // Registrar para notificaciones push (NON-BLOCKING)
+          notificationService.registerForPushNotifications(sessionUser.id)
+            .then(token => {
+              if (token) {
+                setUser(prev => prev ? { ...prev, push_token: token } : profile);
+              }
+            })
+            .catch(err => {
+              console.log('App: Push registration failed silently:', err.message);
+            });
         } else {
           setCurrentScreen('Auth_Login');
         }

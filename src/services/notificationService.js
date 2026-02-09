@@ -1,5 +1,5 @@
 import * as Notifications from 'expo-notifications';
-import { Platform, Alert } from 'react-native';
+import { Alert } from 'react-native';
 import Constants from 'expo-constants';
 import { supabase } from '../../supabase.config';
 
@@ -33,57 +33,110 @@ Notifications.setNotificationCategoryAsync(APPOINTMENT_CATEGORY, [
 export const notificationService = {
     // Solicitar permisos y obtener token del dispositivo
     async registerForPushNotifications(userId) {
-        try {
-            const { status: existingStatus } = await Notifications.getPermissionsAsync();
-            let finalStatus = existingStatus;
+        // Timeout wrapper to prevent infinite hangs
+        const timeoutPromise = new Promise((_, reject) =>
+            setTimeout(() => reject(new Error('Push registration timeout')), 10000)
+        );
 
-            if (existingStatus !== 'granted') {
-                const { status } = await Notifications.requestPermissionsAsync();
-                finalStatus = status;
-            }
+        const registrationPromise = (async () => {
+            try {
+                console.log('[NotificationService] Iniciando registro de push notifications...');
 
-            if (finalStatus !== 'granted') {
-                console.log('[NotificationService] Permiso de notificaciones denegado');
-                return null;
-            }
+                // Step 1: Check permissions
+                const { status: existingStatus } = await Notifications.getPermissionsAsync();
+                let finalStatus = existingStatus;
 
-            // Expo requiere el projectId para obtener el token de push
-            const projectId = Constants?.expoConfig?.extra?.eas?.projectId || Constants?.easConfig?.projectId;
-
-            if (!projectId) {
-                console.log('[NotificationService] Notificaciones Push externas desactivadas: Falta projectId (EAS no configurado)');
-                return null;
-            }
-
-            const token = (await Notifications.getExpoPushTokenAsync({
-                projectId: projectId
-            })).data;
-            console.log('Push Token obtenido:', token);
-
-            // Guardar token en la base de datos
-            if (userId) {
-                const { error: updateError } = await supabase
-                    .from('users')
-                    .update({ push_token: token })
-                    .eq('id', userId);
-
-                if (updateError) {
-                    console.error('[NotificationService] Error guardando token en DB:', updateError);
+                if (existingStatus !== 'granted') {
+                    try {
+                        const { status } = await Notifications.requestPermissionsAsync();
+                        finalStatus = status;
+                    } catch (permError) {
+                        console.log('[NotificationService] Error solicitando permisos:', permError.message);
+                        return null;
+                    }
                 }
-            }
 
-            if (Platform.OS === 'android') {
-                Notifications.setNotificationChannelAsync('default', {
-                    name: 'default',
-                    importance: Notifications.AndroidImportance.MAX,
-                    vibrationPattern: [0, 250, 250, 250],
-                    lightColor: '#1E3A8A',
-                });
-            }
+                if (finalStatus !== 'granted') {
+                    console.log('[NotificationService] Permiso de notificaciones denegado');
+                    return null;
+                }
 
-            return token;
+                // Step 2: Get project ID safely
+                let projectId = null;
+                try {
+                    projectId = Constants?.expoConfig?.extra?.eas?.projectId ||
+                        Constants?.easConfig?.projectId ||
+                        Constants?.manifest?.extra?.eas?.projectId;
+                } catch (err) {
+                    console.log('[NotificationService] Error obteniendo projectId:', err.message);
+                }
+
+                if (!projectId) {
+                    console.log('[NotificationService] Push desactivado: projectId no encontrado');
+                    return null;
+                }
+
+                // Step 3: Get push token
+                let token = null;
+                try {
+                    const tokenData = await Notifications.getExpoPushTokenAsync({
+                        projectId: projectId
+                    });
+                    token = tokenData?.data;
+                    console.log('[NotificationService] Push Token obtenido:', token ? '✓' : '✗');
+                } catch (tokenError) {
+                    console.log('[NotificationService] Error obteniendo token:', tokenError.message);
+                    return null;
+                }
+
+                if (!token) {
+                    console.log('[NotificationService] No se pudo obtener token');
+                    return null;
+                }
+
+                // Step 4: Save token to database
+                if (userId) {
+                    try {
+                        const { error: updateError } = await supabase
+                            .from('users')
+                            .update({ push_token: token })
+                            .eq('id', userId);
+
+                        if (updateError) {
+                            console.error('[NotificationService] Error guardando token en DB:', updateError.message);
+                        } else {
+                            console.log('[NotificationService] Token guardado en DB exitosamente');
+                        }
+                    } catch (dbError) {
+                        console.error('[NotificationService] Excepción guardando token:', dbError.message);
+                    }
+                }
+
+                // Step 5: Setup Android channel (harmless on iOS, will be ignored)
+                try {
+                    await Notifications.setNotificationChannelAsync('default', {
+                        name: 'default',
+                        importance: Notifications.AndroidImportance.MAX,
+                        vibrationPattern: [0, 250, 250, 250],
+                        lightColor: '#1E3A8A',
+                    });
+                } catch (channelError) {
+                    console.log('[NotificationService] Error creando canal (normal en iOS):', channelError.message);
+                }
+
+                console.log('[NotificationService] Registro completado exitosamente');
+                return token;
+            } catch (error) {
+                console.error('[NotificationService] Error crítico en registerForPushNotifications:', error.message);
+                return null;
+            }
+        })();
+
+        // Race between timeout and registration
+        try {
+            return await Promise.race([registrationPromise, timeoutPromise]);
         } catch (error) {
-            console.error('[NotificationService] Error crítico en registerForPushNotifications:', error);
+            console.log('[NotificationService] Push registration failed or timed out:', error.message);
             return null;
         }
     },
@@ -116,6 +169,8 @@ export const notificationService = {
             console.error('Error enviando notificación externa:', error);
         }
     },
+
+
 
     // Crear notificación interna y externa
     async createNotification(userId, title, message) {

@@ -9,6 +9,7 @@ import {
     Alert,
     ActivityIndicator,
     Modal,
+    Platform,
 } from 'react-native';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { Ionicons } from '@expo/vector-icons';
@@ -20,7 +21,7 @@ import { CustomButton } from '../../components/CustomButton';
 import { supabase } from '../../../supabase.config';
 import { COLORS } from '../../constants';
 
-export const DoctorDashboard = ({ navigation, user: initialUser }) => {
+export const DoctorDashboard = ({ navigation, user: initialUser, registerPush }) => {
     const [user, setUser] = useState(initialUser);
     const [appointments, setAppointments] = useState([]);
     const [loading, setLoading] = useState(true);
@@ -47,7 +48,7 @@ export const DoctorDashboard = ({ navigation, user: initialUser }) => {
                         filter: `doctor_id=eq.${user.id}`,
                     },
                     () => {
-                        console.log('DoctorDashboard: Cambio en citas detectado, recargando...');
+
                         loadData(true); // Carga silenciosa para cambios en tiempo real
                     }
                 )
@@ -204,21 +205,7 @@ export const DoctorDashboard = ({ navigation, user: initialUser }) => {
                     <View>
                         <Text style={styles.greeting}>Bienvenido,</Text>
                         <Text style={styles.userName}>Dr. {user?.name}</Text>
-                        {Platform.OS !== 'web' && (
-                            <TouchableOpacity
-                                onPress={props.registerPush}
-                                style={[styles.statusBadge, { backgroundColor: user?.push_token ? '#ecfdf5' : '#fff1f2' }]}
-                            >
-                                <Ionicons
-                                    name={user?.push_token ? "notifications-outline" : "notifications-off-outline"}
-                                    size={12}
-                                    color={user?.push_token ? "#059669" : "#e11d48"}
-                                />
-                                <Text style={[styles.statusText, { color: user?.push_token ? "#059669" : "#e11d48" }]}>
-                                    {user?.push_token ? "Push Activo" : "Push Inactivo"}
-                                </Text>
-                            </TouchableOpacity>
-                        )}
+
                     </View>
                     <TouchableOpacity onPress={handleLogout} style={styles.logoutButton}>
                         <Ionicons name="log-out-outline" size={24} color={COLORS.error} />
