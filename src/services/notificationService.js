@@ -10,7 +10,8 @@ const APPOINTMENT_CATEGORY = 'appointment-confirmation';
 
 Notifications.setNotificationHandler({
     handleNotification: async () => ({
-        shouldShowAlert: true,
+        shouldShowBanner: true,
+        shouldShowList: true,
         shouldPlaySound: true,
         shouldSetBadge: true,
     }),
@@ -143,20 +144,25 @@ export const notificationService = {
 
     // Enviar notificación Push (Externa) vía Expo API
     async sendExternalNotification(pushToken, title, body) {
-        if (!pushToken) return;
+        if (!pushToken) {
+            console.log('[NotificationService] sendExternalNotification: No push token provided');
+            return { success: false, error: 'No push token' };
+        }
 
         try {
+            console.log('[NotificationService] Enviando push a:', pushToken.substring(0, 30) + '...');
+
             const message = {
                 to: pushToken,
                 sound: 'default',
                 title: title,
                 body: body,
-                priority: 'high', // WhatsApp style (Heads-up)
+                priority: 'high',
                 channelId: 'default',
                 data: { title, body },
             };
 
-            await fetch('https://exp.host/--/api/v2/push/send', {
+            const response = await fetch('https://exp.host/--/api/v2/push/send', {
                 method: 'POST',
                 headers: {
                     Accept: 'application/json',
@@ -165,8 +171,66 @@ export const notificationService = {
                 },
                 body: JSON.stringify(message),
             });
+
+            const data = await response.json();
+
+            // Verificar si hay errores en la respuesta
+            if (data.data?.status === 'error') {
+                console.error('[NotificationService] ❌ Expo Push Error:', {
+                    message: data.data.message,
+                    details: data.data.details,
+                });
+                return { success: false, error: data.data.message };
+            } else if (data.data?.status === 'ok') {
+                console.log('[NotificationService] ✅ Push enviado exitosamente');
+                return { success: true };
+            } else {
+                console.log('[NotificationService] Push Response:', JSON.stringify(data));
+                return { success: true };
+            }
         } catch (error) {
-            console.error('Error enviando notificación externa:', error);
+            console.error('[NotificationService] Error enviando notificación externa:', error.message);
+            return { success: false, error: error.message };
+        }
+    },
+
+    // Función de prueba para diagnosticar notificaciones
+    async testNotification(userId) {
+        try {
+            console.log('[NotificationService] === INICIANDO PRUEBA DE NOTIFICACIÓN ===');
+            console.log('[NotificationService] User ID:', userId);
+
+            // 1. Verificar que el usuario existe y tiene token
+            const { data: user, error: userError } = await supabase
+                .from('users')
+                .select('id, name, push_token')
+                .eq('id', userId)
+                .single();
+
+            if (userError) {
+                console.error('[NotificationService] Error buscando usuario:', userError);
+                return { success: false, error: 'Usuario no encontrado' };
+            }
+
+            console.log('[NotificationService] Usuario encontrado:', user.name);
+            console.log('[NotificationService] Push Token:', user.push_token ? 'SÍ TIENE' : 'NO TIENE');
+
+            if (!user.push_token) {
+                return { success: false, error: 'Usuario no tiene push_token registrado' };
+            }
+
+            // 2. Enviar notificación de prueba
+            const result = await this.sendExternalNotification(
+                user.push_token,
+                '🔔 Prueba de Notificación',
+                'Si ves esto, las notificaciones funcionan correctamente!'
+            );
+
+            console.log('[NotificationService] === FIN PRUEBA ===', result);
+            return result;
+        } catch (error) {
+            console.error('[NotificationService] Error en prueba:', error);
+            return { success: false, error: error.message };
         }
     },
 

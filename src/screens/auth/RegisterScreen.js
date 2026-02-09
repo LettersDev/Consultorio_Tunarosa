@@ -4,9 +4,10 @@ import {
     Text,
     StyleSheet,
     ScrollView,
-    KeyboardAvoidingView,
+    Keyboard,
     Platform,
     Alert,
+    TouchableWithoutFeedback,
 } from 'react-native';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { CustomInput } from '../../components/CustomInput';
@@ -78,7 +79,10 @@ export const RegisterScreen = ({ navigation }) => {
     const handleRegister = async () => {
         if (!validateForm()) return;
 
+        Keyboard.dismiss();
         setLoading(true);
+
+        await new Promise(resolve => setTimeout(resolve, 150));
 
         const userData = {
             name: formData.name,
@@ -120,126 +124,132 @@ export const RegisterScreen = ({ navigation }) => {
         }
     };
 
+    const dismissKeyboard = () => {
+        Keyboard.dismiss();
+    };
+
     return (
-        <KeyboardAvoidingView
-            behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-            style={styles.container}
-        >
-            <ScrollView contentContainerStyle={styles.scrollContent}>
-                <View style={styles.header}>
-                    <Text style={styles.title}>Registro de Paciente</Text>
-                    <Text style={styles.subtitle}>Complete sus datos personales</Text>
-                </View>
-
-                <View style={styles.form}>
-                    <CustomInput
-                        label="Nombre Completo *"
-                        value={formData.name}
-                        onChangeText={(value) => updateField('name', value)}
-                        placeholder="Juan Pérez"
-                        error={errors.name}
-                    />
-
-                    <CustomButton
-                        title={`Fecha de Nacimiento: ${formData.birthDate.toLocaleDateString()}`}
-                        onPress={() => setShowDatePicker(true)}
-                        variant="outline"
-                        style={styles.dateButton}
-                    />
-
-                    {showDatePicker && (
-                        <DateTimePicker
-                            value={formData.birthDate instanceof Date ? formData.birthDate : new Date()}
-                            mode="date"
-                            display="default"
-                            onChange={onDateChange}
-                            maximumDate={new Date()}
-                        />
-                    )}
-
-                    <CustomInput
-                        label="Edad *"
-                        value={formData.age}
-                        onChangeText={(value) => updateField('age', value)}
-                        placeholder="25"
-                        keyboardType="numeric"
-                        error={errors.age}
-                    />
-
-                    <CustomInput
-                        label="Teléfono * (+58)"
-                        value={formData.phone}
-                        onChangeText={(value) => updateField('phone', value)}
-                        placeholder="4121234567"
-                        keyboardType="phone-pad"
-                        error={errors.phone}
-                        prefix="+58 "
-                    />
-
-                    <CustomInput
-                        label="Correo Electrónico *"
-                        value={formData.email}
-                        onChangeText={(value) => updateField('email', value)}
-                        placeholder="ejemplo@correo.com"
-                        keyboardType="email-address"
-                        error={errors.email}
-                    />
-
-                    <CustomInput
-                        label="Alergias (opcional)"
-                        value={formData.allergies}
-                        onChangeText={(value) => updateField('allergies', value)}
-                        placeholder="Penicilina, polen, etc."
-                        multiline
-                        numberOfLines={2}
-                    />
-
-                    <CustomInput
-                        label="Medicamentos que toma (opcional)"
-                        value={formData.medications}
-                        onChangeText={(value) => updateField('medications', value)}
-                        placeholder="Aspirina, insulina, etc."
-                        multiline
-                        numberOfLines={2}
-                    />
-
-                    <CustomInput
-                        label="Contraseña *"
-                        value={formData.password}
-                        onChangeText={(value) => updateField('password', value)}
-                        placeholder="Mínimo 6 caracteres"
-                        secureTextEntry
-                        error={errors.password}
-                    />
-
-                    <CustomInput
-                        label="Confirmar Contraseña *"
-                        value={formData.confirmPassword}
-                        onChangeText={(value) => updateField('confirmPassword', value)}
-                        placeholder="Repita su contraseña"
-                        secureTextEntry
-                        error={errors.confirmPassword}
-                    />
-
-                    <CustomButton
-                        title="Registrarse"
-                        onPress={handleRegister}
-                        loading={loading}
-                        style={styles.registerButton}
-                    />
-
-                    <View style={styles.loginContainer}>
-                        <Text style={styles.loginText}>¿Ya tienes cuenta? </Text>
-                        <CustomButton
-                            title="Inicia sesión"
-                            onPress={() => navigation.navigate('Auth_Login')}
-                            variant="outline"
-                            style={styles.loginButton}
-                        />
+        <TouchableWithoutFeedback onPress={dismissKeyboard} accessible={false}>
+            <View style={styles.container}>
+                <ScrollView
+                    contentContainerStyle={styles.scrollContent}
+                    keyboardShouldPersistTaps="handled"
+                >
+                    <View style={styles.header}>
+                        <Text style={styles.title}>Registro de Paciente</Text>
+                        <Text style={styles.subtitle}>Complete sus datos personales</Text>
                     </View>
-                </View>
-            </ScrollView>
-        </KeyboardAvoidingView>
+
+                    <View style={styles.form}>
+                        <CustomInput
+                            label="Nombre Completo *"
+                            value={formData.name}
+                            onChangeText={(value) => updateField('name', value)}
+                            placeholder="Juan Pérez"
+                            error={errors.name}
+                        />
+
+                        <CustomButton
+                            title={`Fecha de Nacimiento: ${formData.birthDate.toLocaleDateString()}`}
+                            onPress={() => setShowDatePicker(true)}
+                            variant="outline"
+                            style={styles.dateButton}
+                        />
+
+                        {showDatePicker && (
+                            <DateTimePicker
+                                value={formData.birthDate instanceof Date ? formData.birthDate : new Date()}
+                                mode="date"
+                                display="default"
+                                onChange={onDateChange}
+                                maximumDate={new Date()}
+                            />
+                        )}
+
+                        <CustomInput
+                            label="Edad *"
+                            value={formData.age}
+                            onChangeText={(value) => updateField('age', value)}
+                            placeholder="25"
+                            keyboardType="numeric"
+                            error={errors.age}
+                        />
+
+                        <CustomInput
+                            label="Teléfono * (+58)"
+                            value={formData.phone}
+                            onChangeText={(value) => updateField('phone', value)}
+                            placeholder="4121234567"
+                            keyboardType="phone-pad"
+                            error={errors.phone}
+                            prefix="+58 "
+                        />
+
+                        <CustomInput
+                            label="Correo Electrónico *"
+                            value={formData.email}
+                            onChangeText={(value) => updateField('email', value)}
+                            placeholder="ejemplo@correo.com"
+                            keyboardType="email-address"
+                            error={errors.email}
+                        />
+
+                        <CustomInput
+                            label="Alergias (opcional)"
+                            value={formData.allergies}
+                            onChangeText={(value) => updateField('allergies', value)}
+                            placeholder="Penicilina, polen, etc."
+                            multiline
+                            numberOfLines={2}
+                        />
+
+                        <CustomInput
+                            label="Medicamentos que toma (opcional)"
+                            value={formData.medications}
+                            onChangeText={(value) => updateField('medications', value)}
+                            placeholder="Aspirina, insulina, etc."
+                            multiline
+                            numberOfLines={2}
+                        />
+
+                        <CustomInput
+                            label="Contraseña *"
+                            value={formData.password}
+                            onChangeText={(value) => updateField('password', value)}
+                            placeholder="Mínimo 6 caracteres"
+                            secureTextEntry
+                            error={errors.password}
+                        />
+
+                        <CustomInput
+                            label="Confirmar Contraseña *"
+                            value={formData.confirmPassword}
+                            onChangeText={(value) => updateField('confirmPassword', value)}
+                            placeholder="Repita su contraseña"
+                            secureTextEntry
+                            error={errors.confirmPassword}
+                        />
+
+                        <CustomButton
+                            title="Registrarse"
+                            onPress={handleRegister}
+                            loading={loading}
+                            style={styles.registerButton}
+                        />
+
+                        <View style={styles.loginContainer}>
+                            <Text style={styles.loginText}>¿Ya tienes cuenta? </Text>
+                            <CustomButton
+                                title="Inicia sesión"
+                                onPress={() => navigation.navigate('Auth_Login')}
+                                variant="outline"
+                                style={styles.loginButton}
+                            />
+                        </View>
+                    </View>
+                </ScrollView>
+            </View>
+        </TouchableWithoutFeedback>
     );
 };
 

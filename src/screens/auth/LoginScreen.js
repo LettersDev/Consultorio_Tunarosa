@@ -4,10 +4,11 @@ import {
     Text,
     StyleSheet,
     ScrollView,
-    KeyboardAvoidingView,
+    Keyboard,
     Platform,
     Alert,
     TouchableOpacity,
+    TouchableWithoutFeedback,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { CustomInput } from '../../components/CustomInput';
@@ -41,7 +42,14 @@ export const LoginScreen = ({ navigation }) => {
     const handleLogin = async () => {
         if (!validateForm()) return;
 
+        // Dismiss keyboard first
+        Keyboard.dismiss();
+
         setLoading(true);
+
+        // Wait for keyboard to fully close before proceeding
+        await new Promise(resolve => setTimeout(resolve, 150));
+
         const { data, error } = await authService.signIn(email, password);
         setLoading(false);
 
@@ -78,63 +86,71 @@ export const LoginScreen = ({ navigation }) => {
         }
     };
 
+    // Dismiss keyboard when tapping outside inputs
+    const dismissKeyboard = () => {
+        Keyboard.dismiss();
+    };
+
     return (
-        <KeyboardAvoidingView
-            behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-            style={styles.container}
-        >
-            <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
-                <View style={styles.header}>
-                    <Text style={styles.title}>Consultorio Tunarosa</Text>
-                    <Text style={styles.subtitle}>Cuidado dental de confianza</Text>
-                </View>
-
-                <View style={styles.card}>
-                    <Text style={styles.cardTitle}>Bienvenido</Text>
-                    <Text style={styles.cardSubtitle}>Ingresa tus credenciales para continuar</Text>
-
-                    <View style={styles.form}>
-                        <CustomInput
-                            label="Correo Electrónico"
-                            value={email}
-                            onChangeText={setEmail}
-                            placeholder="ejemplo@correo.com"
-                            keyboardType="email-address"
-                            error={errors.email}
-                            icon="mail-outline"
-                        />
-
-                        <CustomInput
-                            label="Contraseña"
-                            value={password}
-                            onChangeText={setPassword}
-                            placeholder="••••••••"
-                            secureTextEntry
-                            error={errors.password}
-                            icon="lock-closed-outline"
-                        />
-
-                        <TouchableOpacity onPress={handleForgotPassword} style={styles.forgotPassword}>
-                            <Text style={styles.forgotPasswordText}>¿Olvidaste tu contraseña?</Text>
-                        </TouchableOpacity>
-
-                        <CustomButton
-                            title="Iniciar Sesión"
-                            onPress={handleLogin}
-                            loading={loading}
-                            style={styles.loginButton}
-                        />
+        <TouchableWithoutFeedback onPress={dismissKeyboard} accessible={false}>
+            <View style={styles.container}>
+                <ScrollView
+                    contentContainerStyle={styles.scrollContent}
+                    showsVerticalScrollIndicator={false}
+                    keyboardShouldPersistTaps="handled"
+                >
+                    <View style={styles.header}>
+                        <Text style={styles.title}>Consultorio Tunarosa</Text>
+                        <Text style={styles.subtitle}>Cuidado dental de confianza</Text>
                     </View>
-                </View>
 
-                <View style={styles.footer}>
-                    <Text style={styles.registerText}>¿Aún no tienes una cuenta?</Text>
-                    <TouchableOpacity onPress={() => navigation.navigate('Auth_Register')}>
-                        <Text style={styles.registerLink}>Regístrate ahora</Text>
-                    </TouchableOpacity>
-                </View>
-            </ScrollView>
-        </KeyboardAvoidingView>
+                    <View style={styles.card}>
+                        <Text style={styles.cardTitle}>Bienvenido</Text>
+                        <Text style={styles.cardSubtitle}>Ingresa tus credenciales para continuar</Text>
+
+                        <View style={styles.form}>
+                            <CustomInput
+                                label="Correo Electrónico"
+                                value={email}
+                                onChangeText={setEmail}
+                                placeholder="ejemplo@correo.com"
+                                keyboardType="email-address"
+                                error={errors.email}
+                                icon="mail-outline"
+                            />
+
+                            <CustomInput
+                                label="Contraseña"
+                                value={password}
+                                onChangeText={setPassword}
+                                placeholder="••••••••"
+                                secureTextEntry
+                                error={errors.password}
+                                icon="lock-closed-outline"
+                            />
+
+                            <TouchableOpacity onPress={handleForgotPassword} style={styles.forgotPassword}>
+                                <Text style={styles.forgotPasswordText}>¿Olvidaste tu contraseña?</Text>
+                            </TouchableOpacity>
+
+                            <CustomButton
+                                title="Iniciar Sesión"
+                                onPress={handleLogin}
+                                loading={loading}
+                                style={styles.loginButton}
+                            />
+                        </View>
+                    </View>
+
+                    <View style={styles.footer}>
+                        <Text style={styles.registerText}>¿Aún no tienes una cuenta?</Text>
+                        <TouchableOpacity onPress={() => navigation.navigate('Auth_Register')}>
+                            <Text style={styles.registerLink}>Regístrate ahora</Text>
+                        </TouchableOpacity>
+                    </View>
+                </ScrollView>
+            </View>
+        </TouchableWithoutFeedback>
     );
 };
 

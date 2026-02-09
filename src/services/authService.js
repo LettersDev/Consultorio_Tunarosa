@@ -79,7 +79,13 @@ export const authService = {
     async getSession() {
         try {
             const { data, error } = await supabase.auth.getSession();
-            if (error) throw error;
+
+            // Treat auth errors (like invalid refresh token) as "no session"
+            // This prevents re-render loops on fresh installs
+            if (error) {
+                console.log('[AuthService] Session error (treating as no session):', error.message);
+                return { data: null, error: null };
+            }
 
             if (data.session) {
                 // Get user data
@@ -97,7 +103,8 @@ export const authService = {
 
             return { data: null, error: null };
         } catch (error) {
-            return { data: null, error };
+            console.log('[AuthService] getSession caught error:', error.message);
+            return { data: null, error: null };
         }
     },
 
