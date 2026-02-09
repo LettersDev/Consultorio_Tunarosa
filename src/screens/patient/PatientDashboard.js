@@ -29,7 +29,7 @@ export const PatientDashboard = ({ navigation, user: initialUser, registerPush }
     useEffect(() => {
         loadData();
         if (user?.id) {
-            notificationService.registerForPushNotifications(user.id);
+            // notificationService.registerForPushNotifications(user.id); // Handled in App.js
 
             // Suscribirse a nuevas notificaciones en tiempo real
             const notifSub = supabase

@@ -36,6 +36,8 @@ export const DoctorDashboard = ({ navigation, user: initialUser, registerPush })
 
     useEffect(() => {
         if (user?.id) {
+            // notificationService.registerForPushNotifications(user.id); // Handled in App.js
+
             // Suscribirse a cambios en citas en tiempo real para este doctor
             const subscription = supabase
                 .channel(`doctor-apts-${user.id}`)

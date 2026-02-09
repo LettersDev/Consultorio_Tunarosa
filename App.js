@@ -180,20 +180,21 @@ export default function App() {
   // --- Manual Router Logic ---
   const goBack = () => navigate('Dashboard');
 
+  // Memoize registerPush to avoid re-creating it on every render
+  const registerPush = React.useCallback(() => {
+    if (user?.id) {
+      notificationService.registerForPushNotifications(user.id).then(token => {
+        if (token) {
+          setUser(prev => prev ? { ...prev, push_token: token } : null);
+        }
+      });
+    }
+  }, [user?.id]);
+
+  const nav = React.useMemo(() => ({ navigate, goBack, logout }), []);
+  const commonProps = React.useMemo(() => ({ navigation: nav, user, registerPush }), [nav, user, registerPush]);
+
   const renderScreen = () => {
-    const registerPush = () => {
-      if (user?.id) {
-        notificationService.registerForPushNotifications(user.id).then(token => {
-          if (token) {
-            setUser(prev => prev ? { ...prev, push_token: token } : null);
-          }
-        });
-      }
-    };
-
-    const nav = { navigate, goBack, logout };
-    const commonProps = { navigation: nav, user, registerPush };
-
     // 1. Auth Flow
     if (currentScreen === 'Auth_Login') {
       return <LoginScreen navigation={{ ...nav, navigate: (s) => navigate(s === 'Register' ? 'Auth_Register' : s) }} />;
@@ -210,6 +211,7 @@ export default function App() {
       if (user?.role === 'admin') return <AdminDashboard {...commonProps} />;
       return <LoginScreen navigation={{ ...nav, navigate: (s) => navigate('Auth_Register') }} />;
     }
+
 
     // 3. Sub-screens
     // Patient
