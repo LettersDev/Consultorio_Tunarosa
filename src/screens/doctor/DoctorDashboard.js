@@ -292,7 +292,7 @@ export const DoctorDashboard = ({ navigation }) => {
                                                 onPress={() => handleConfirm(appointment.id)}
                                                 variant="outline"
                                                 style={[styles.dashboardActionBtn, { borderColor: COLORS.success }]}
-                                                textStyle={{ color: COLORS.success }}
+                                                textStyle={[styles.dashboardActionText, { color: COLORS.success }]}
                                             />
                                         )}
                                         <CustomButton
@@ -302,20 +302,21 @@ export const DoctorDashboard = ({ navigation }) => {
                                                 appointmentId: appointment.id
                                             })}
                                             style={styles.dashboardActionBtn}
+                                            textStyle={styles.dashboardActionText}
                                         />
                                         <CustomButton
                                             title="Reagendar"
                                             onPress={() => openRescheduleModal(appointment.id)}
                                             variant="outline"
                                             style={[styles.dashboardActionBtn, { borderColor: COLORS.warning }]}
-                                            textStyle={{ color: COLORS.warning }}
+                                            textStyle={[styles.dashboardActionText, { color: COLORS.warning }]}
                                         />
                                         <CustomButton
                                             title="Cancelar"
                                             onPress={() => handleCancel(appointment.id)}
                                             variant="outline"
                                             style={[styles.dashboardActionBtn, { borderColor: COLORS.error }]}
-                                            textStyle={{ color: COLORS.error }}
+                                            textStyle={[styles.dashboardActionText, { color: COLORS.error }]}
                                         />
                                     </View>
                                 </View>
@@ -372,17 +373,24 @@ export const DoctorDashboard = ({ navigation }) => {
 
                 <View style={styles.quickActions}>
                     <CustomButton
-                        title="Ver Todos los Pacientes"
+                        title="Ver Pacientes"
                         onPress={() => navigation.navigate('DoctorPatients')}
                         variant="outline"
                         style={styles.quickActionBtn}
                         icon="people-outline"
                     />
                     <CustomButton
-                        title="Gestionar Calendario"
+                        title="Calendario"
                         onPress={() => navigation.navigate('ManageAvailability')}
                         style={styles.quickActionBtn}
                         icon="calendar-outline"
+                    />
+                    <CustomButton
+                        title="Anuncios"
+                        onPress={() => navigation.navigate('Shared_Broadcast')}
+                        style={styles.quickActionBtn}
+                        variant="secondary"
+                        icon="megaphone-outline"
                     />
                 </View>
                 <View style={styles.footerSpacer} />
@@ -632,14 +640,20 @@ const styles = StyleSheet.create({
     },
     dashboardActionRow: {
         flexDirection: 'row',
+        flexWrap: 'wrap',
         backgroundColor: COLORS.background,
-        padding: 12,
-        gap: 10,
+        padding: 10,
+        gap: 8,
     },
     dashboardActionBtn: {
         flex: 1,
-        height: 44,
-        borderRadius: 12,
+        minWidth: '45%',
+        height: 38,
+        borderRadius: 10,
+    },
+    dashboardActionText: {
+        fontSize: 12,
+        fontWeight: '700',
     },
     upcomingCard: {
         flexDirection: 'row',

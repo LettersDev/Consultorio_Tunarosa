@@ -26,8 +26,10 @@ import { AddTreatmentScreen } from './src/screens/doctor/AddTreatmentScreen';
 import { AddPrescriptionScreen } from './src/screens/doctor/AddPrescriptionScreen';
 import { ManageAvailabilityScreen } from './src/screens/secretary/ManageAvailabilityScreen';
 import { AppointmentsOverviewScreen } from './src/screens/secretary/AppointmentsOverviewScreen';
+import { BroadcastScreen } from './src/screens/shared/BroadcastScreen';
 
 import { authService } from './src/services/authService';
+import { notificationService } from './src/services/notificationService';
 import { COLORS } from './src/constants';
 
 export default function App() {
@@ -42,6 +44,9 @@ export default function App() {
     let lastUserId = null;
 
     checkUser();
+
+    // Configurar escuchas de notificaciones interactivas
+    const notificationSubscription = notificationService.initNotificationHandlers();
 
     let authSubscription = null;
 
@@ -82,6 +87,9 @@ export default function App() {
       isMounted = false;
       if (authSubscription) {
         authSubscription.unsubscribe();
+      }
+      if (notificationSubscription) {
+        notificationSubscription.remove();
       }
     };
   }, []);
@@ -167,6 +175,7 @@ export default function App() {
     // Secretary
     if (currentScreen === 'ManageAvailability') return <ManageAvailabilityScreen navigation={nav} />;
     if (currentScreen === 'AppointmentsOverview') return <AppointmentsOverviewScreen navigation={nav} />;
+    if (currentScreen === 'Shared_Broadcast') return <BroadcastScreen navigation={nav} />;
 
     return <View />;
   };

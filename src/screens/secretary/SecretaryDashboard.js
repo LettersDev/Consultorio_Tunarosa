@@ -248,11 +248,18 @@ export const SecretaryDashboard = ({ navigation }) => {
                         icon="add-circle-outline"
                     />
                     <CustomButton
-                        title="Ver Todas las Citas"
+                        title="Ver Citas"
                         onPress={() => navigation.navigate('AppointmentsOverview')}
                         variant="outline"
                         style={styles.quickActionBtn}
                         icon="list-outline"
+                    />
+                    <CustomButton
+                        title="Anuncios"
+                        onPress={() => navigation.navigate('Shared_Broadcast')}
+                        style={styles.quickActionBtn}
+                        variant="secondary"
+                        icon="megaphone-outline"
                     />
                 </View>
                 <View style={styles.footerSpacer} />

@@ -1,9 +1,13 @@
 import * as Notifications from 'expo-notifications';
-import { Platform } from 'react-native';
+import { Platform, Alert } from 'react-native';
 import Constants from 'expo-constants';
 import { supabase } from '../../supabase.config';
 
-// Configuración básica para recibir notificaciones
+// Configuración de categorías de notificación interactiva
+const CONFIRM_ACTION = 'CONFIRM_APPOINTMENT';
+const CANCEL_ACTION = 'CANCEL_APPOINTMENT';
+const APPOINTMENT_CATEGORY = 'appointment-confirmation';
+
 Notifications.setNotificationHandler({
     handleNotification: async () => ({
         shouldShowAlert: true,
@@ -11,6 +15,20 @@ Notifications.setNotificationHandler({
         shouldSetBadge: true,
     }),
 });
+
+// Definir las categorías globales
+Notifications.setNotificationCategoryAsync(APPOINTMENT_CATEGORY, [
+    {
+        identifier: CONFIRM_ACTION,
+        buttonTitle: '✅ Sí, asistiré',
+        options: { isDestructive: false },
+    },
+    {
+        identifier: CANCEL_ACTION,
+        buttonTitle: '❌ No podré asistir',
+        options: { isDestructive: true },
+    },
+]);
 
 export const notificationService = {
     // Solicitar permisos y obtener token del dispositivo
@@ -129,7 +147,7 @@ export const notificationService = {
                 console.log('[NotificationService] El usuario no tiene push_token registrado.');
             }
 
-            return { data: internalNotif, error: null };
+            return { success: true, error: null };
         } catch (error) {
             console.error('[NotificationService] Fallo crítico:', error);
             return { data: null, error };
@@ -208,5 +226,205 @@ export const notificationService = {
         const title = '✅ Cita Confirmada';
         const message = `Tu cita ha sido programada para el ${appointment.date} a las ${appointment.time}. ¡Te esperamos!`;
         return this.createNotification(appointment.patient_id, title, message);
+    },
+
+    // Sync local reminders for the device (1 hour before, interactive)
+    async syncLocalReminders(appointments) {
+        try {
+            await Notifications.cancelAllScheduledNotificationsAsync();
+            const now = new Date();
+
+            for (const apt of appointments) {
+                // Solo citas confirmadas o pendientes que sean hoy o en el futuro
+                if (apt.status === 'cancelled' || apt.status === 'completed') continue;
+
+                const aptDateTime = new Date(`${apt.date}T${apt.time}:00`);
+                const reminderTime = new Date(aptDateTime.getTime() - 60 * 60 * 1000);
+
+                if (reminderTime > new Date(now.getTime() + 60 * 1000)) {
+                    console.log(`[NotificationService] Programando confirmación interactiva para cita ${apt.id} el ${reminderTime}`);
+
+                    await Notifications.scheduleNotificationAsync({
+                        content: {
+                            title: '📅 Confirmación de Asistencia',
+                            body: `Hola ${apt.patient?.name || ''}, ¿podrás asistir a tu cita de las ${apt.time} hoy?`,
+                            sound: 'default',
+                            categoryIdentifier: APPOINTMENT_CATEGORY,
+                            data: { appointmentId: apt.id, type: 'confirmation-request' },
+                        },
+                        trigger: reminderTime,
+                    });
+                }
+            }
+            return { success: true };
+        } catch (error) {
+            console.error('[NotificationService] Error sincronizando recordatorios:', error);
+            return { success: false, error };
+        }
+    },
+
+    // Initialize notification response listener
+    initNotificationHandlers(onStatusUpdate) {
+        return Notifications.addNotificationResponseReceivedListener(async (response) => {
+            const { actionIdentifier, notification } = response;
+            const { appointmentId } = notification.request.content.data;
+
+            if (!appointmentId) return;
+
+            console.log(`[NotificationService] Respuesta recibida: ${actionIdentifier} para cita ${appointmentId}`);
+
+            try {
+                if (actionIdentifier === CONFIRM_ACTION) {
+                    await supabase
+                        .from('appointments')
+                        .update({ status: 'confirmed', confirmed: true })
+                        .eq('id', appointmentId);
+
+                    // Notificar al personal
+                    this.notifyStaffAboutConfirmation(appointmentId);
+
+                    // Alerta interna para feedback visual
+                    Alert.alert('✅ Confirmado', 'Tu asistencia ha sido registrada. ¡Gracias!');
+                }
+                else if (actionIdentifier === CANCEL_ACTION) {
+                    // Notificar antes de cancelar para tener los datos
+                    await this.notifyStaffAboutCancellation(appointmentId);
+
+                    await supabase
+                        .from('appointments')
+                        .update({ status: 'cancelled' })
+                        .eq('id', appointmentId);
+
+                    Alert.alert('❌ Cancelado', 'Entendido. La cita ha sido cancelada.');
+                }
+
+                if (onStatusUpdate) onStatusUpdate();
+            } catch (error) {
+                console.error('[NotificationService] Error procesando respuesta:', error);
+            }
+        });
+    },
+
+    // Notificar al Doctor y Secretaria sobre una cancelación del paciente
+    async notifyStaffAboutCancellation(appointmentId) {
+        try {
+            const { data: apt, error: aptError } = await supabase
+                .from('appointments')
+                .select('*, patient:users!appointments_patient_id_fkey(name)')
+                .eq('id', appointmentId)
+                .single();
+
+            if (aptError || !apt) return;
+
+            const title = '⚠️ Cita Cancelada';
+            const message = `El paciente ${apt.patient?.name || 'Desconocido'} canceló su cita de las ${apt.time}.`;
+
+            const { data: staff, error: staffError } = await supabase
+                .from('users')
+                .select('id')
+                .or(`id.eq.${apt.doctor_id},role.eq.secretary,role.eq.admin`);
+
+            if (staffError || !staff) return;
+
+            const notifications = staff.map(s => this.createNotification(s.id, title, message));
+            await Promise.all(notifications);
+        } catch (error) {
+            console.error('[NotificationService] Error notificando cancelación:', error);
+        }
+    },
+
+    // Notificar al Doctor y Secretaria sobre una confirmación del paciente
+    async notifyStaffAboutConfirmation(appointmentId) {
+        try {
+            const { data: apt, error: aptError } = await supabase
+                .from('appointments')
+                .select('*, patient:users!appointments_patient_id_fkey(name)')
+                .eq('id', appointmentId)
+                .single();
+
+            if (aptError || !apt) return;
+
+            const title = '✅ Cita Confirmada';
+            const message = `El paciente ${apt.patient?.name || 'Desconocido'} confirmó su asistencia para las ${apt.time}.`;
+
+            const { data: staff, error: staffError } = await supabase
+                .from('users')
+                .select('id')
+                .or(`id.eq.${apt.doctor_id},role.eq.secretary,role.eq.admin`);
+
+            if (staffError || !staff) return;
+
+            const notifications = staff.map(s => this.createNotification(s.id, title, message));
+            await Promise.all(notifications);
+        } catch (error) {
+            console.error('[NotificationService] Error notificando confirmación:', error);
+        }
+    },
+
+    // Enviar notificación a TODOS los pacientes (Difusión)
+    async sendBroadcastNotification(title, message) {
+        try {
+            console.log('[NotificationService] Iniciando difusión masiva...');
+
+            // 1. Obtener todos los pacientes con push_token
+            const { data: patients, error: patientsError } = await supabase
+                .from('users')
+                .select('id, push_token')
+                .eq('role', 'patient');
+
+            if (patientsError) throw patientsError;
+            if (!patients || patients.length === 0) {
+                return { success: false, message: 'No hay pacientes registrados.' };
+            }
+
+            // 2. Filtrar tokens válidos
+            const pushTokens = patients
+                .filter(p => p.push_token)
+                .map(p => p.push_token);
+
+            // 3. Crear registros internos para cada paciente (para que lo vean en su app)
+            const internalNotifications = patients.map(p => ({
+                user_id: p.id,
+                title: title,
+                message: message,
+                read: false
+            }));
+
+            const { error: insertError } = await supabase
+                .from('notifications')
+                .insert(internalNotifications);
+
+            if (insertError) {
+                console.error('[NotificationService] Error al insertar notificaciones internas en difusión:', insertError);
+            }
+
+            // 4. Enviar Push masivos vía Expo (en lotes si son muchos, pero aquí lo haremos directo)
+            if (pushTokens.length > 0) {
+                // Expo permite enviar arreglos de mensajes
+                const messages = pushTokens.map(token => ({
+                    to: token,
+                    sound: 'default',
+                    title: title,
+                    body: message,
+                }));
+
+                // Enviamos a la API de Expo
+                await fetch('https://exp.host/--/api/v2/push/send', {
+                    method: 'POST',
+                    headers: {
+                        Accept: 'application/json',
+                        'Accept-encoding': 'gzip, deflate',
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify(messages),
+                });
+            }
+
+            console.log(`[NotificationService] Difusión completada para ${patients.length} pacientes.`);
+            return { success: true, count: patients.length };
+        } catch (error) {
+            console.error('[NotificationService] Error en difusión:', error);
+            return { success: false, error };
+        }
     }
 };

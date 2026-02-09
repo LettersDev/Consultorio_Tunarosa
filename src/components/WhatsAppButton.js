@@ -48,7 +48,7 @@ export const WhatsAppButton = React.memo(({
         >
             <Ionicons name="logo-whatsapp" size={24} color={COLORS.surface} />
             <Text style={styles.buttonText}>
-                Contactar por WhatsApp{userName ? ` a ${userName}` : ''}
+                Contactar {userName ? ` a ${userName}` : ''}
             </Text>
         </TouchableOpacity>
     );

@@ -169,6 +169,11 @@ export const appointmentService = {
                 status: 'cancelled'
             }, reason);
 
+            // Si canceló el paciente, avisar al staff
+            if (changedBy === 'patient') {
+                notificationService.notifyStaffAboutCancellation(appointmentId);
+            }
+
             return { data: { id: appointmentId, status: 'cancelled' }, error: null };
         } catch (error) {
             console.error('Error cancelling appointment:', error);
