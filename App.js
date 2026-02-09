@@ -166,7 +166,7 @@ export default function App() {
           <View style={styles.loadingContainer}>
             <ActivityIndicator animating={true} size="large" color={COLORS.primary} />
             <Text style={{ marginTop: 20, color: COLORS.primary, fontWeight: '700' }}>Iniciando aplicación...</Text>
-            <Text style={{ marginTop: 10, fontSize: 11, color: '#94a3b8' }}>v1.2.0 - Push Activado</Text>
+            <Text style={{ marginTop: 10, fontSize: 11, color: '#94a3b8' }}>v1.2.1 - Firebase Stable</Text>
           </View>
         </PaperProvider>
       </SafeAreaProvider>

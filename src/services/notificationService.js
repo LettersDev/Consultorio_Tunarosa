@@ -43,11 +43,7 @@ export const notificationService = {
             }
 
             if (finalStatus !== 'granted') {
-                console.log('Permiso de notificaciones denegado');
-                Alert.alert(
-                    '📍 Permiso Necesario',
-                    'Para recibir alertas como WhatsApp, por favor activa las notificaciones en los ajustes de tu celular.'
-                );
+                console.log('[NotificationService] Permiso de notificaciones denegado');
                 return null;
             }
 
@@ -56,7 +52,6 @@ export const notificationService = {
 
             if (!projectId) {
                 console.log('[NotificationService] Notificaciones Push externas desactivadas: Falta projectId (EAS no configurado)');
-                Alert.alert('Configuración EAS', 'No se encontró el ProjectID de Expo. Notificaciones desactivadas.');
                 return null;
             }
 
@@ -88,8 +83,7 @@ export const notificationService = {
 
             return token;
         } catch (error) {
-            console.error('Error en registerForPushNotifications:', error);
-            Alert.alert('Error de Registro Push', error.message || JSON.stringify(error));
+            console.error('[NotificationService] Error crítico en registerForPushNotifications:', error);
             return null;
         }
     },
