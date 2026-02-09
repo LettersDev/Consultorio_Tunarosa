@@ -163,20 +163,6 @@ export default function App() {
     await authService.signOut();
   };
 
-  if (loading) {
-    return (
-      <SafeAreaProvider>
-        <PaperProvider>
-          <View style={styles.loadingContainer}>
-            <ActivityIndicator animating={true} size="large" color={COLORS.primary} />
-            <Text style={{ marginTop: 20, color: COLORS.primary, fontWeight: '700' }}>Iniciando aplicación...</Text>
-            <Text style={{ marginTop: 10, fontSize: 11, color: '#94a3b8' }}>v1.2.1 - Firebase Stable</Text>
-          </View>
-        </PaperProvider>
-      </SafeAreaProvider>
-    );
-  }
-
   // --- Manual Router Logic ---
   const goBack = () => navigate('Dashboard');
 
@@ -193,6 +179,20 @@ export default function App() {
 
   const nav = React.useMemo(() => ({ navigate, goBack, logout }), []);
   const commonProps = React.useMemo(() => ({ navigation: nav, user, registerPush }), [nav, user, registerPush]);
+
+  if (loading) {
+    return (
+      <SafeAreaProvider>
+        <PaperProvider>
+          <View style={styles.loadingContainer}>
+            <ActivityIndicator animating={true} size="large" color={COLORS.primary} />
+            <Text style={{ marginTop: 20, color: COLORS.primary, fontWeight: '700' }}>Iniciando aplicación...</Text>
+            <Text style={{ marginTop: 10, fontSize: 11, color: '#94a3b8' }}>v1.2.2 - Firebase Stable</Text>
+          </View>
+        </PaperProvider>
+      </SafeAreaProvider>
+    );
+  }
 
   const renderScreen = () => {
     // 1. Auth Flow
